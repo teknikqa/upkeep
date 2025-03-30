@@ -1,0 +1,93 @@
+package provider
+
+import "context"
+
+// ExportNewRegistry exposes newRegistry for testing purposes.
+func ExportNewRegistry() *Registry {
+	return newRegistry()
+}
+
+// ExportParseBrewOutdated exposes parseBrewOutdated for testing.
+// Returns nil items if parsing fails.
+func ExportParseBrewOutdated(_ *BrewProvider, jsonStr string) []OutdatedItem {
+	items, _ := parseBrewOutdated(jsonStr)
+	return items
+}
+
+// ParseBrewCaskOutdated exposes parseBrewCaskOutdated for testing.
+func ParseBrewCaskOutdated(jsonStr string) ([]OutdatedItem, error) {
+	casks, err := parseBrewCaskOutdated(jsonStr)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]OutdatedItem, 0, len(casks))
+	for _, c := range casks {
+		installed := ""
+		if len(c.InstalledVersions) > 0 {
+			installed = c.InstalledVersions[0]
+		}
+		items = append(items, OutdatedItem{
+			Name:           c.Name,
+			CurrentVersion: installed,
+			LatestVersion:  c.CurrentVersion,
+		})
+	}
+	return items, nil
+}
+
+// DetectAuthRequired exposes detectAuthRequired for testing.
+func (p *BrewCaskProvider) DetectAuthRequired(ctx context.Context, name string) bool {
+	return p.detectAuthRequired(ctx, name)
+}
+
+// BuildDeferredScript builds the deferred cask script content for testing.
+func BuildDeferredScript(casks []string) string {
+	p := &BrewCaskProvider{}
+	return p.buildDeferredScriptContent(casks)
+}
+
+// GetByName exposes the global registry's Get function for testing.
+func GetByName(name string) (Provider, error) {
+	return globalRegistry.Get(name)
+}
+
+// ParseNpmOutdated exposes parseNpmOutdated for testing.
+func ParseNpmOutdated(jsonStr string) ([]OutdatedItem, error) {
+	return parseNpmOutdated(jsonStr)
+}
+
+// CommandExistsExport exposes CommandExists for testing.
+func CommandExistsExport(name string) bool {
+	return CommandExists(name)
+}
+
+// ParseComposerOutdated exposes parseComposerOutdated for testing.
+func ParseComposerOutdated(jsonStr string) ([]OutdatedItem, error) {
+	return parseComposerOutdated(jsonStr)
+}
+
+// ParsePipOutdated exposes parsePipOutdated for testing.
+func ParsePipOutdated(jsonStr string) ([]OutdatedItem, error) {
+	return parsePipOutdated(jsonStr)
+}
+
+// ParseRustupCheck exposes parseRustupCheck for testing.
+func ParseRustupCheck(output string) []OutdatedItem {
+	return parseRustupCheck(output)
+}
+
+// ParseCargoInstallUpdateList exposes parseCargoInstallUpdateList for testing.
+func ParseCargoInstallUpdateList(output string) []OutdatedItem {
+	return parseCargoInstallUpdateList(output)
+}
+
+// ParseVagrantVersion exposes parseVagrantVersion for testing.
+func ParseVagrantVersion(output string) (installed, latest string) {
+	return parseVagrantVersion(output)
+}
+
+// ParseVirtualBoxVersion strips the build suffix from a VBoxManage --version string.
+func ParseVirtualBoxVersion(output string) string {
+	p := &VirtualBoxProvider{}
+	return p.stripBuildSuffix(output)
+}
