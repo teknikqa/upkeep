@@ -12,6 +12,7 @@ linters:
     - misspell
     - unconvert
     - nolintlint
+    - gosec
 
   settings:
     errcheck:
@@ -24,6 +25,15 @@ linters:
         - os.Remove
         - os.MkdirAll
         - (*github.com/teknikqa/upkeep/internal/logging.Logger).Close
+    gosec:
+      excludes:
+        - G104  # Unhandled errors on Close/Remove — already covered by errcheck exclusions
+        - G204  # Subprocess launched with variable — intentional; this tool runs CLI commands
+        - G301  # Directory permissions > 0750 — 0755 is standard for dirs
+        - G302  # File permissions > 0600 — log files use 0640 intentionally
+        - G304  # File inclusion via variable — paths come from user config, not external input
+        - G306  # WriteFile permissions > 0600 — deferred scripts need 0700
+        - G115  # Integer overflow uintptr→int — standard Go pattern for Fd() calls
     staticcheck:
       checks:
         - "all"
@@ -45,6 +55,7 @@ linters:
         linters:
           - unused
           - errcheck
+          - gosec
       - linters:
           - errcheck
         text: '(?i)\.Close'
