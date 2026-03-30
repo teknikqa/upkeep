@@ -1,0 +1,25 @@
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - gosimple
+    - gocritic
+    - revive
+    - misspell
+    - prealloc
+    - unconvert
+    - nolintlint
+
+issues:
+  exclude-rules:
+    # Allow unused parameters in test files
+    - path: _test\.go
+      linters:
+        - unused
+        - errcheck
+
+run:
+  timeout: 5m
