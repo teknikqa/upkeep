@@ -9,22 +9,16 @@ on:
 permissions:
   contents: read
 
-env:
-  GOTOOLCHAIN: local
-
 jobs:
   test:
-    name: Test (Go ${{ matrix.go-version }})
+    name: Test
     runs-on: macos-latest
-    strategy:
-      matrix:
-        go-version: ["1.23", "1.24"]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: stable
 
       - name: Download dependencies
         run: go mod download
@@ -43,15 +37,13 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
-
-      - name: Patch go directive for linter compatibility
-        run: sed -i '' 's/^go .*/go 1.24/' go.mod
+          go-version: stable
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
           version: "v2.1"
+          args: --go=0
 
       - name: go vet
         run: go vet ./...
