@@ -50,4 +50,5 @@ linters:
         text: '(?i)\.Close'
 
 run:
+  go: "1.24"
   timeout: 5m

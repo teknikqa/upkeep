@@ -43,7 +43,6 @@ jobs:
         uses: golangci/golangci-lint-action@v7
         with:
           version: "v2.1"
-          args: --go=0
 
       - name: go vet
         run: go vet ./...
