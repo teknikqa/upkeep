@@ -16,44 +16,44 @@ A Go CLI tool that keeps your macOS development environment up to date.
 ## Installation
 
 ```bash
-# Build and install to ~/bin/update
+# Build and install to ~/bin/upkeep
 make install
 
 # Or just build locally
 make build
 ```
 
-Requires Go 1.21+.
+Requires Go 1.24+.
 
 ## Usage
 
 ```bash
 # Update all available providers
-update
+upkeep
 
 # Scan only — show what would be updated
-update --dry-run
+upkeep --dry-run
 
 # Update without confirmation prompt
-update --yes
+upkeep --yes
 
 # Update specific providers
-update brew npm
+upkeep brew npm
 
 # Re-run only providers that failed last time
-update --retry-failed
+upkeep --retry-failed
 
 # Execute deferred auth-required cask updates
-update --run-deferred
+upkeep --run-deferred
 
 # Show full subprocess output on console
-update --verbose
+upkeep --verbose
 
 # List all available providers
-update --list
+upkeep --list
 
 # Use a custom config file
-update --config ~/.config/upkeep/config.yaml
+upkeep --config ~/.config/upkeep/config.yaml
 ```
 
 ## Configuration

@@ -1,5 +1,5 @@
 BINARY   := upkeep
-INSTALL  := $(HOME)/bin/update
+INSTALL  := $(HOME)/bin/upkeep
 GO       := go
 GOFLAGS  :=
 
@@ -12,7 +12,7 @@ all: build
 build:
 	$(GO) build $(GOFLAGS) -o $(BINARY) .
 
-# Install the binary to ~/bin/update
+# Install the binary to ~/bin/upkeep
 .PHONY: install
 install: build
 	@mkdir -p $(dir $(INSTALL))
