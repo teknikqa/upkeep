@@ -1,5 +1,10 @@
 # upkeep
 
+[![CI](https://github.com/teknikqa/upkeep/actions/workflows/ci.yml/badge.svg)](https://github.com/teknikqa/upkeep/actions/workflows/ci.yml)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/teknikqa/upkeep)](https://go.dev/)
+[![License](https://img.shields.io/github/license/teknikqa/upkeep)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/teknikqa/upkeep)](https://github.com/teknikqa/upkeep/releases/latest)
+
 A Go CLI tool that keeps your macOS development environment up to date.
 
 ## Features
@@ -16,11 +21,14 @@ A Go CLI tool that keeps your macOS development environment up to date.
 ## Installation
 
 ```bash
+# Install with go install
+go install github.com/teknikqa/upkeep@latest
+
+# Or build from source
+make build
+
 # Build and install to ~/bin/upkeep
 make install
-
-# Or just build locally
-make build
 ```
 
 Requires Go 1.24+.
