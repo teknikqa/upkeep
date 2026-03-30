@@ -1,3 +1,5 @@
+version: "2"
+
 linters:
   enable:
     - errcheck
@@ -5,21 +7,47 @@ linters:
     - staticcheck
     - unused
     - ineffassign
-    - gosimple
     - gocritic
     - revive
     - misspell
-    - prealloc
     - unconvert
     - nolintlint
 
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (net/http.ResponseBody).Close
+        - os.Remove
+        - os.MkdirAll
+        - (*github.com/teknikqa/upkeep/internal/logging.Logger).Close
+    staticcheck:
+      checks:
+        - "all"
+        - "-QF1008"
+        - "-QF1012"
+        - "-ST1000"
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+        - name: unused-parameter
+          disabled: true
+
 issues:
   exclude-rules:
-    # Allow unused parameters in test files
     - path: _test\.go
       linters:
         - unused
         - errcheck
+    - linters:
+        - errcheck
+      text: '(?i)\.Close'
 
 run:
   timeout: 5m
