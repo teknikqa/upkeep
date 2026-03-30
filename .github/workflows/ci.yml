@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  GOTOOLCHAIN: local
+
 jobs:
   test:
     name: Test (Go ${{ matrix.go-version }})
@@ -41,6 +44,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.24"
+
+      - name: Patch go directive for linter compatibility
+        run: sed -i '' 's/^go .*/go 1.24/' go.mod
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
