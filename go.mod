@@ -1,11 +1,11 @@
 module github.com/teknikqa/upkeep
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/pterm/pterm v0.12.83
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/sys v0.41.0
+	golang.org/x/sys v0.42.0
 	golang.org/x/term v0.40.0
 	gopkg.in/yaml.v3 v3.0.1
 )
