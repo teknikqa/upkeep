@@ -1,6 +1,7 @@
 # upkeep
 
 [![CI](https://github.com/teknikqa/upkeep/actions/workflows/ci.yml/badge.svg)](https://github.com/teknikqa/upkeep/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/teknikqa/upkeep/branch/main/graph/badge.svg)](https://codecov.io/gh/teknikqa/upkeep)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/teknikqa/upkeep)](https://go.dev/)
 [![License](https://img.shields.io/github/license/teknikqa/upkeep)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/teknikqa/upkeep)](https://github.com/teknikqa/upkeep/releases/latest)
