@@ -1,3 +1,4 @@
+// Package cmd implements the cobra CLI interface for upkeep.
 package cmd
 
 import (

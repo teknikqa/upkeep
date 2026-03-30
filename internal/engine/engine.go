@@ -1,3 +1,5 @@
+// Package engine orchestrates the scan → confirm → execute → report pipeline.
+// It coordinates providers, manages state persistence, and drives the TUI output.
 package engine
 
 import (
