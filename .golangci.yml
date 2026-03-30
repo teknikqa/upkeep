@@ -39,15 +39,15 @@ linters:
         - name: unused-parameter
           disabled: true
 
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - unused
-        - errcheck
-    - linters:
-        - errcheck
-      text: '(?i)\.Close'
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - unused
+          - errcheck
+      - linters:
+          - errcheck
+        text: '(?i)\.Close'
 
 run:
   timeout: 5m
