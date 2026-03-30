@@ -1,6 +1,6 @@
 module github.com/teknikqa/upkeep
 
-go 1.26.1
+go 1.25.0
 
 require (
 	github.com/pterm/pterm v0.12.83
