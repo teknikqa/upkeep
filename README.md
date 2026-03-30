@@ -126,8 +126,20 @@ State is written to `~/.local/state/upkeep/last-run.json` after each run. It rec
 # Run all tests
 make test
 
-# Lint (go vet + staticcheck)
+# Run tests with coverage report
+make coverage
+
+# Lint (go vet + golangci-lint)
 make lint
+
+# Format code
+make fmt
+
+# Run full CI pipeline locally (fmt, lint, test, build)
+make ci
+
+# GoReleaser dry-run
+make release-dry-run
 
 # Tidy dependencies
 make tidy

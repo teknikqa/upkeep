@@ -29,25 +29,50 @@ test:
 test-verbose:
 	$(GO) test ./... -v -timeout 120s
 
-# Run go vet + staticcheck (install staticcheck if missing)
+# Run go vet + golangci-lint
 .PHONY: lint
 lint:
 	$(GO) vet ./...
-	@if command -v staticcheck >/dev/null 2>&1; then \
-		staticcheck ./...; \
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run; \
 	else \
-		echo "staticcheck not installed — skipping (run: go install honnef.co/go/tools/cmd/staticcheck@latest)"; \
+		echo "golangci-lint not installed — skipping (see https://golangci-lint.run/docs/install/)"; \
 	fi
 
-# Remove the built binary
+# Remove the built binary and coverage output
 .PHONY: clean
 clean:
-	rm -f $(BINARY)
+	rm -f $(BINARY) coverage.out coverage.html
 
 # Tidy go.mod / go.sum
 .PHONY: tidy
 tidy:
 	$(GO) mod tidy
+
+# Run tests with coverage and generate HTML report
+.PHONY: coverage
+coverage:
+	$(GO) test ./... -timeout 120s -coverprofile=coverage.out
+	$(GO) tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: coverage.html"
+
+# Format all Go source files
+.PHONY: fmt
+fmt:
+	$(GO) fmt ./...
+
+# GoReleaser dry-run (snapshot, no publish)
+.PHONY: release-dry-run
+release-dry-run:
+	@if command -v goreleaser >/dev/null 2>&1; then \
+		goreleaser release --snapshot --clean; \
+	else \
+		echo "goreleaser not installed — skipping (see https://goreleaser.com/install/)"; \
+	fi
+
+# Run the full CI pipeline locally: fmt, lint, test, build
+.PHONY: ci
+ci: fmt lint test build
 
 # Dry-run: scan only, no updates
 .PHONY: dry-run
