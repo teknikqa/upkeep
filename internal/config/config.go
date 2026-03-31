@@ -126,8 +126,8 @@ type LoggingConfig struct {
 	Level string `yaml:"level"` // "debug" | "info" | "warn" | "error"
 }
 
-// defaults returns a Config populated with sensible defaults.
-func defaults() *Config {
+// Defaults returns a Config populated with sensible defaults.
+func Defaults() *Config {
 	return &Config{
 		Parallelism: 4,
 		Providers: ProvidersConfig{
@@ -189,7 +189,7 @@ func defaults() *Config {
 // If path is empty or the file does not exist, defaults are returned.
 // If the file exists but is invalid YAML, an error is returned.
 func Load(path string) (*Config, error) {
-	cfg := defaults()
+	cfg := Defaults()
 
 	if path == "" {
 		path = DefaultConfigPath()
@@ -215,7 +215,7 @@ func Load(path string) (*Config, error) {
 	// Expand home in path fields.
 	expandHomePaths(cfg)
 
-	if err := validate(cfg); err != nil {
+	if err := Validate(cfg); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
@@ -230,8 +230,8 @@ func expandHomePaths(cfg *Config) {
 	cfg.Providers.Vim.BundlesDir = expandHome(cfg.Providers.Vim.BundlesDir)
 }
 
-// validate checks that config values are within acceptable ranges.
-func validate(cfg *Config) error {
+// Validate checks that config values are within acceptable ranges.
+func Validate(cfg *Config) error {
 	if cfg.Parallelism < 1 {
 		return fmt.Errorf("parallelism must be >= 1, got %d", cfg.Parallelism)
 	}
