@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/pterm/pterm"
@@ -59,7 +60,7 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) {
 			} else if r.Error != nil {
 				status = "❌ scan error"
 			}
-			pkgList := formatPackageList(r.Packages, 4)
+			pkgList := formatPackageList(r.Packages)
 			outdated := fmt.Sprintf("%d", r.OutdatedCount)
 			if !r.Available {
 				outdated = "-"
@@ -77,7 +78,7 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) {
 			} else if r.Error != nil {
 				status = "scan error"
 			}
-			pkgList := formatPackageList(r.Packages, 4)
+			pkgList := formatPackageList(r.Packages)
 			outdated := fmt.Sprintf("%d", r.OutdatedCount)
 			if !r.Available {
 				outdated = "-"
@@ -196,26 +197,12 @@ func ScanSummaryRowsFromResults(results map[string]provider.ScanResult, displayN
 	return rows
 }
 
-// formatPackageList returns the first n package names joined by ", " with "..." if truncated.
-func formatPackageList(pkgs []string, n int) string {
+// formatPackageList returns package names joined by ", ", or "-" if empty.
+func formatPackageList(pkgs []string) string {
 	if len(pkgs) == 0 {
 		return "-"
 	}
-	if len(pkgs) <= n {
-		return joinStrings(pkgs, ", ")
-	}
-	return joinStrings(pkgs[:n], ", ") + fmt.Sprintf(", ... (+%d more)", len(pkgs)-n)
-}
-
-func joinStrings(ss []string, sep string) string {
-	result := ""
-	for i, s := range ss {
-		if i > 0 {
-			result += sep
-		}
-		result += s
-	}
-	return result
+	return strings.Join(pkgs, ", ")
 }
 
 func statusEmoji(status string) string {
