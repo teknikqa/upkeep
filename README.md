@@ -18,7 +18,7 @@ A Go CLI tool that keeps your macOS development environment up to date.
 - **Auth-required cask partitioning**: detects which casks need admin auth via dry-run probe + heuristic fallback; defers them to a separate script
 - **Resumability**: JSON state file tracks last-run results; `--retry-failed` re-runs only failed providers
 - **Deferred cask script**: `--run-deferred` executes the generated script for auth-required casks
-- **YAML config** with per-provider skip lists, auth overrides, and strategy settings
+- **YAML config** with per-provider skip lists, auth overrides, and strategy settings — editable via **interactive TUI** or by hand
 - **macOS notifications** via `terminal-notifier` (falls back to `osascript`)
 
 ## Installation
@@ -84,9 +84,27 @@ upkeep --list
 upkeep --config ~/.config/upkeep/config.yaml
 ```
 
+### Managing Configuration
+
+```bash
+# Launch interactive config editor (TUI)
+upkeep config edit
+
+# Print current effective configuration as YAML
+upkeep config show
+
+# Print config file path
+upkeep config path
+
+# Reset configuration to defaults
+upkeep config reset
+```
+
 ## Configuration
 
 Config file location: `~/.config/upkeep/config.yaml` (auto-created with defaults on first run).
+
+Use `upkeep config edit` to modify settings interactively, or edit the file directly:
 
 ```yaml
 parallelism: 4

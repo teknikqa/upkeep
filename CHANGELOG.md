@@ -7,16 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-31
+
 ### Added
 
-- README badges for CI, coverage, Go version, license, and latest release
-- `go install` instructions in README
-- `.editorconfig` for cross-editor consistency
-- Makefile targets: `coverage`, `fmt`, `ci`, `release-dry-run`
-- Package comments for `engine` and `cmd` packages
-- Codecov integration for test coverage tracking
-- `gosec` security linter with targeted exclusions
-- This changelog
+- **Interactive config editor**: `upkeep config edit` launches a menu-driven TUI for editing all configuration settings — providers, parallelism, notifications, logging — with type-appropriate editors (toggles, number inputs, enum selects, list management)
+- **Config subcommands**: `upkeep config show` (print effective config as YAML), `upkeep config path` (print config file location), `upkeep config reset` (restore defaults with confirmation)
+- `config.Save()` function for validated config persistence with automatic directory creation
+- Exported `config.Validate()` and `config.Defaults()` for reuse across packages
+- Notification tool validation (`terminal-notifier` or `osascript`) in config validation
+
+### Changed
+
+- README updated with config management documentation
 
 ## [0.1.0] - 2026-03-30
 
@@ -47,5 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release**: GoReleaser for macOS amd64 + arm64 binaries
 - **Dependabot**: Weekly updates for Go modules and GitHub Actions
 
-[Unreleased]: https://github.com/teknikqa/upkeep/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/teknikqa/upkeep/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/teknikqa/upkeep/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/teknikqa/upkeep/releases/tag/v0.1.0
