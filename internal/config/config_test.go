@@ -181,6 +181,14 @@ func TestValidate_InvalidLogLevel(t *testing.T) {
 	}
 }
 
+func TestValidate_InvalidNotificationTool(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Notifications.Tool = "growl"
+	if err := config.Validate(cfg); err == nil {
+		t.Fatal("expected error for invalid notification tool")
+	}
+}
+
 func TestSave_WritesValidConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")

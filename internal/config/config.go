@@ -279,6 +279,12 @@ func Validate(cfg *Config) error {
 	default:
 		return fmt.Errorf("logging level must be one of: debug, info, warn, error; got %q", cfg.Logging.Level)
 	}
+	switch cfg.Notifications.Tool {
+	case "terminal-notifier", "osascript":
+		// valid
+	default:
+		return fmt.Errorf("notification tool must be one of: terminal-notifier, osascript; got %q", cfg.Notifications.Tool)
+	}
 	return nil
 }
 
