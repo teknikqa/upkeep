@@ -73,7 +73,39 @@ var configResetCmd = &cobra.Command{
 	},
 }
 
+var configEditCmd = &cobra.Command{
+	Use:   "edit",
+	Short: "Interactively edit configuration (TUI)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := config.Load(cfgFile)
+		if err != nil {
+			return fmt.Errorf("loading config: %w", err)
+		}
+
+		edited, saved, err := ui.RunConfigEditor(cfg)
+		if err != nil {
+			return fmt.Errorf("config editor: %w", err)
+		}
+
+		if !saved {
+			ui.PrintInfo("No changes saved.")
+			return nil
+		}
+
+		path := cfgFile
+		if path == "" {
+			path = config.DefaultConfigPath()
+		}
+
+		if err := config.Save(edited, path); err != nil {
+			return fmt.Errorf("saving config: %w", err)
+		}
+		ui.PrintInfo("Configuration saved to %s", path)
+		return nil
+	},
+}
+
 func init() {
-	configCmd.AddCommand(configShowCmd, configPathCmd, configResetCmd)
+	configCmd.AddCommand(configShowCmd, configPathCmd, configResetCmd, configEditCmd)
 	rootCmd.AddCommand(configCmd)
 }
