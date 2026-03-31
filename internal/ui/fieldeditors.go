@@ -169,7 +169,9 @@ func editMapStringBool(label string, current map[string]bool) (map[string]bool, 
 				continue
 			}
 			keys := mapKeys(m)
-			togOpts := append(keys, "Cancel")
+			togOpts := make([]string, len(keys)+1)
+			copy(togOpts, keys)
+			togOpts[len(keys)] = "Cancel"
 			toToggle, err := pterm.DefaultInteractiveSelect.
 				WithDefaultText("Select entry to toggle").
 				WithOptions(togOpts).
@@ -185,7 +187,9 @@ func editMapStringBool(label string, current map[string]bool) (map[string]bool, 
 				continue
 			}
 			keys := mapKeys(m)
-			remOpts := append(keys, "Cancel")
+			remOpts := make([]string, len(keys)+1)
+			copy(remOpts, keys)
+			remOpts[len(keys)] = "Cancel"
 			toRemove, err := pterm.DefaultInteractiveSelect.
 				WithDefaultText("Select entry to remove").
 				WithOptions(remOpts).
