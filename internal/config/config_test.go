@@ -124,6 +124,119 @@ providers:
 	}
 }
 
+func TestDefaults_ReturnsPopulatedConfig(t *testing.T) {
+	cfg := config.Defaults()
+	if cfg.Parallelism != 4 {
+		t.Errorf("expected default parallelism=4, got %d", cfg.Parallelism)
+	}
+	if !cfg.Providers.Brew.Enabled {
+		t.Error("expected brew enabled by default")
+	}
+	if cfg.Providers.BrewCask.AuthStrategy != "defer" {
+		t.Errorf("expected default auth_strategy=defer, got %q", cfg.Providers.BrewCask.AuthStrategy)
+	}
+	if cfg.Logging.Level != "info" {
+		t.Errorf("expected default log level=info, got %q", cfg.Logging.Level)
+	}
+	if cfg.Notifications.Tool != "terminal-notifier" {
+		t.Errorf("expected default notification tool=terminal-notifier, got %q", cfg.Notifications.Tool)
+	}
+	if len(cfg.Providers.VSCode.Editors) == 0 {
+		t.Error("expected default VSCode editors to be non-empty")
+	}
+}
+
+func TestValidate_ValidConfig(t *testing.T) {
+	cfg := config.Defaults()
+	if err := config.Validate(cfg); err != nil {
+		t.Fatalf("expected defaults to pass validation, got: %v", err)
+	}
+}
+
+func TestValidate_InvalidParallelism(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Parallelism = 0
+	if err := config.Validate(cfg); err == nil {
+		t.Fatal("expected error for parallelism=0")
+	}
+	cfg.Parallelism = 33
+	if err := config.Validate(cfg); err == nil {
+		t.Fatal("expected error for parallelism=33")
+	}
+}
+
+func TestValidate_InvalidAuthStrategy(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Providers.BrewCask.AuthStrategy = "bogus"
+	if err := config.Validate(cfg); err == nil {
+		t.Fatal("expected error for invalid auth_strategy")
+	}
+}
+
+func TestValidate_InvalidLogLevel(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Logging.Level = "trace"
+	if err := config.Validate(cfg); err == nil {
+		t.Fatal("expected error for invalid log level")
+	}
+}
+
+func TestSave_WritesValidConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	cfg := config.Defaults()
+	cfg.Parallelism = 8
+	cfg.Providers.Brew.Enabled = false
+
+	if err := config.Save(cfg, path); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+
+	loaded, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load failed after Save: %v", err)
+	}
+	if loaded.Parallelism != 8 {
+		t.Errorf("expected parallelism=8, got %d", loaded.Parallelism)
+	}
+	if loaded.Providers.Brew.Enabled {
+		t.Error("expected brew disabled after roundtrip")
+	}
+}
+
+func TestSave_CreatesDirectories(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "nested", "deep", "config.yaml")
+
+	cfg := config.Defaults()
+	if err := config.Save(cfg, path); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected file to exist at %q, got: %v", path, err)
+	}
+}
+
+func TestSave_RejectsInvalidConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	cfg := config.Defaults()
+	cfg.Parallelism = 0
+
+	err := config.Save(cfg, path)
+	if err == nil {
+		t.Fatal("expected error for invalid config")
+	}
+
+	// File should NOT have been written.
+	if _, statErr := os.Stat(path); statErr == nil {
+		t.Error("expected no file to be written for invalid config")
+	}
+}
+
 // writeTempFile creates a temp file with the given content and returns its path.
 func writeTempFile(t *testing.T, content string) string {
 	t.Helper()
