@@ -114,16 +114,25 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 
 	// Count available/outdated providers.
 	totalOutdated := 0
+	hasAlwaysUpdate := false
 	for _, r := range scanResults {
 		totalOutdated += len(r.Outdated)
+		if r.AlwaysUpdate && r.Available {
+			hasAlwaysUpdate = true
+		}
 	}
-	if totalOutdated == 0 {
+	if totalOutdated == 0 && !hasAlwaysUpdate {
 		fmt.Fprintln(out, "Everything is up to date.")
 		return nil
 	}
 
 	// Phase 4: Confirm.
-	msg := fmt.Sprintf("Update %d package(s) across %d provider(s)?", totalOutdated, len(providers))
+	var msg string
+	if totalOutdated > 0 {
+		msg = fmt.Sprintf("Update %d package(s) across %d provider(s)?", totalOutdated, len(providers))
+	} else {
+		msg = fmt.Sprintf("Run updates across %d provider(s)?", len(providers))
+	}
 	if !ui.Confirm(msg, opts.Yes) {
 		fmt.Fprintln(out, "Aborted.")
 		return nil

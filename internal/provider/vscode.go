@@ -2,8 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/teknikqa/upkeep/internal/config"
@@ -25,52 +23,36 @@ func (p *VSCodeProvider) Name() string        { return "vscode" }
 func (p *VSCodeProvider) DisplayName() string { return "VS Code / Editors" }
 func (p *VSCodeProvider) DependsOn() []string { return nil }
 
-// Scan checks which configured editors are installed and counts their extensions.
+// Scan checks which configured editors are installed.
+// Extensions cannot be checked for outdated status without marketplace APIs,
+// so Scan reports zero outdated. Update() discovers editors independently.
 func (p *VSCodeProvider) Scan(ctx context.Context) ScanResult {
 	editors := p.cfg.Editors
 	if len(editors) == 0 {
 		editors = []string{"code", "cursor", "kiro", "windsurf", "agy"}
 	}
 
-	var items []OutdatedItem
+	found := false
 	for _, editor := range editors {
-		if !CommandExists(editor) {
-			continue
+		if CommandExists(editor) {
+			found = true
+			break
 		}
-		// Count extensions for informational display.
-		count := p.countExtensions(ctx, editor)
-		items = append(items, OutdatedItem{
-			Name:          editor,
-			LatestVersion: fmt.Sprintf("%d extensions", count),
-		})
 	}
 
-	if len(items) == 0 {
+	if !found {
 		return ScanResult{Available: false, Message: "no editors found"}
 	}
-	return ScanResult{Available: true, Outdated: items}
-}
-
-// countExtensions returns the number of installed extensions for an editor.
-func (p *VSCodeProvider) countExtensions(ctx context.Context, editor string) int {
-	stdout, _, err := RunCommand(ctx, editor, "--list-extensions")
-	if err != nil {
-		return 0
-	}
-	lines := strings.Split(strings.TrimSpace(stdout), "\n")
-	count := 0
-	for _, l := range lines {
-		if strings.TrimSpace(l) != "" {
-			count++
-		}
-	}
-	return count
+	return ScanResult{Available: true, AlwaysUpdate: true}
 }
 
 // Update runs `<editor> --update-extensions` for each available editor with timeout.
-func (p *VSCodeProvider) Update(ctx context.Context, items []OutdatedItem) UpdateResult {
-	if len(items) == 0 {
-		return UpdateResult{}
+// Unlike other providers, this ignores items (Scan reports no outdated) and
+// discovers editors directly from config.
+func (p *VSCodeProvider) Update(ctx context.Context, _ []OutdatedItem) UpdateResult {
+	editors := p.cfg.Editors
+	if len(editors) == 0 {
+		editors = []string{"code", "cursor", "kiro", "windsurf", "agy"}
 	}
 
 	start := time.Now()
@@ -81,22 +63,22 @@ func (p *VSCodeProvider) Update(ctx context.Context, items []OutdatedItem) Updat
 		timeoutSecs = 300
 	}
 
-	for _, item := range items {
-		if !CommandExists(item.Name) {
+	for _, editor := range editors {
+		if !CommandExists(editor) {
 			continue
 		}
 		editorCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSecs)*time.Second)
-		out, err := RunCommandWithLog(editorCtx, p.logger, item.Name, "--update-extensions")
+		out, err := RunCommandWithLog(editorCtx, p.logger, editor, "--update-extensions")
 		cancel()
 		if err != nil {
 			if editorCtx.Err() == context.DeadlineExceeded {
-				p.logf("%s --update-extensions timed out after %ds", item.Name, timeoutSecs)
+				p.logf("%s --update-extensions timed out after %ds", editor, timeoutSecs)
 			} else {
-				p.logf("%s --update-extensions error: %v\n%s", item.Name, err, out)
+				p.logf("%s --update-extensions error: %v\n%s", editor, err, out)
 			}
-			failed = append(failed, item.Name)
+			failed = append(failed, editor)
 		} else {
-			updated = append(updated, item.Name)
+			updated = append(updated, editor)
 		}
 	}
 
