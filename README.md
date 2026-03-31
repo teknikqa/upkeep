@@ -8,6 +8,8 @@
 
 A Go CLI tool that keeps your macOS development environment up to date.
 
+![demo](demo.gif)
+
 ## Features
 
 - **11 providers**: Homebrew formulae, Homebrew casks, npm, Composer, pip, Rust, VS Code extensions, Oh My Zsh, Vim, Vagrant, VirtualBox
