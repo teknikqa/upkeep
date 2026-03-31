@@ -23,6 +23,25 @@ A Go CLI tool that keeps your macOS development environment up to date.
 
 ## Installation
 
+### From a release
+
+Download the latest archive from the [releases page](https://github.com/teknikqa/upkeep/releases/latest):
+
+```bash
+# macOS Apple Silicon (arm64)
+curl -sL https://github.com/teknikqa/upkeep/releases/latest/download/upkeep_$(curl -s https://api.github.com/repos/teknikqa/upkeep/releases/latest | grep tag_name | cut -d '"' -f4 | tr -d v)_darwin_arm64.tar.gz | tar xz
+
+# macOS Intel (amd64)
+curl -sL https://github.com/teknikqa/upkeep/releases/latest/download/upkeep_$(curl -s https://api.github.com/repos/teknikqa/upkeep/releases/latest | grep tag_name | cut -d '"' -f4 | tr -d v)_darwin_amd64.tar.gz | tar xz
+
+# Move to a directory in your PATH
+sudo mv upkeep /usr/local/bin/
+```
+
+### From source
+
+Requires Go 1.24+.
+
 ```bash
 # Install with go install
 go install github.com/teknikqa/upkeep@latest
@@ -33,8 +52,6 @@ make build
 # Build and install to ~/bin/upkeep
 make install
 ```
-
-Requires Go 1.24+.
 
 ## Usage
 
