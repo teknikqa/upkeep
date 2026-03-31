@@ -185,6 +185,35 @@ func Defaults() *Config {
 	}
 }
 
+// Save validates cfg and writes it to path as YAML.
+// If path is empty, DefaultConfigPath() is used.
+// Parent directories are created if they do not exist.
+func Save(cfg *Config, path string) error {
+	if err := Validate(cfg); err != nil {
+		return fmt.Errorf("invalid config: %w", err)
+	}
+
+	if path == "" {
+		path = DefaultConfigPath()
+	}
+	path = expandHome(path)
+
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("marshalling config: %w", err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("creating config directory: %w", err)
+	}
+
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("writing config file %q: %w", path, err)
+	}
+
+	return nil
+}
+
 // Load reads a config file from path and returns a Config.
 // If path is empty or the file does not exist, defaults are returned.
 // If the file exists but is invalid YAML, an error is returned.
