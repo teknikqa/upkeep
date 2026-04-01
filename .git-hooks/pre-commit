@@ -11,14 +11,9 @@ fi
 
 printf '==> pre-commit: checking staged Go files\n'
 
-# 1. Format check — fail if any staged file isn't gofmt'd.
-UNFORMATTED=$(gofmt -l $STAGED_GO 2>/dev/null || true)
-if [ -n "$UNFORMATTED" ]; then
-    printf 'ERROR: the following files need gofmt:\n'
-    printf '  %s\n' $UNFORMATTED
-    printf 'Run: go fmt ./...\n'
-    exit 1
-fi
+# 1. Auto-format staged Go files and re-stage them.
+gofmt -w $STAGED_GO
+git add $STAGED_GO
 
 # 2. go vet
 printf '==> go vet ./...\n'
