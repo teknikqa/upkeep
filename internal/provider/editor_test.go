@@ -10,26 +10,26 @@ import (
 	"github.com/teknikqa/upkeep/internal/provider"
 )
 
-func TestVSCodeProvider_Name(t *testing.T) {
-	p := provider.NewVSCodeProvider(config.VSCodeConfig{Enabled: true, Editors: []string{"code"}}, nil)
-	if p.Name() != "vscode" {
-		t.Errorf("expected %q, got %q", "vscode", p.Name())
+func TestEditorProvider_Name(t *testing.T) {
+	p := provider.NewEditorProvider(config.EditorConfig{Enabled: true, Editors: []string{"code"}}, nil)
+	if p.Name() != "editor" {
+		t.Errorf("expected %q, got %q", "editor", p.Name())
 	}
 	if p.DisplayName() != "VS Code / Editors" {
 		t.Errorf("expected %q, got %q", "VS Code / Editors", p.DisplayName())
 	}
 }
 
-func TestVSCodeProvider_DependsOn(t *testing.T) {
-	p := provider.NewVSCodeProvider(config.VSCodeConfig{Enabled: true}, nil)
+func TestEditorProvider_DependsOn(t *testing.T) {
+	p := provider.NewEditorProvider(config.EditorConfig{Enabled: true}, nil)
 	if deps := p.DependsOn(); len(deps) != 0 {
 		t.Errorf("expected no dependencies, got %v", deps)
 	}
 }
 
-func TestVSCodeProvider_Scan_NoEditors(t *testing.T) {
+func TestEditorProvider_Scan_NoEditors(t *testing.T) {
 	// Use a non-existent editor name to simulate no editors installed.
-	p := provider.NewVSCodeProvider(config.VSCodeConfig{
+	p := provider.NewEditorProvider(config.EditorConfig{
 		Enabled: true,
 		Editors: []string{"nonexistent-editor-xyz-abc"},
 		Timeout: 5,
@@ -40,7 +40,7 @@ func TestVSCodeProvider_Scan_NoEditors(t *testing.T) {
 	}
 }
 
-func TestVSCodeProvider_Timeout(t *testing.T) {
+func TestEditorProvider_Timeout(t *testing.T) {
 	// Verify timeout is respected: run `sleep` as the "editor".
 	// This tests that the per-editor context deadline fires.
 	// Only run on systems where sleep is available.
@@ -48,7 +48,7 @@ func TestVSCodeProvider_Timeout(t *testing.T) {
 		t.Skip("sleep not available")
 	}
 
-	p := provider.NewVSCodeProvider(config.VSCodeConfig{
+	p := provider.NewEditorProvider(config.EditorConfig{
 		Enabled: true,
 		Editors: []string{"sleep"},
 		Timeout: 1,
@@ -67,13 +67,13 @@ func TestVSCodeProvider_Timeout(t *testing.T) {
 	_ = result
 }
 
-func TestVSCodeProvider_Registered(t *testing.T) {
-	p, err := provider.GetByName("vscode")
+func TestEditorProvider_Registered(t *testing.T) {
+	p, err := provider.GetByName("editor")
 	if err != nil {
-		t.Fatalf("vscode not registered: %v", err)
+		t.Fatalf("editor not registered: %v", err)
 	}
-	if p.Name() != "vscode" {
-		t.Errorf("expected vscode, got %s", p.Name())
+	if p.Name() != "editor" {
+		t.Errorf("expected editor, got %s", p.Name())
 	}
 }
 

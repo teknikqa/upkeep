@@ -141,8 +141,8 @@ func TestDefaults_ReturnsPopulatedConfig(t *testing.T) {
 	if cfg.Notifications.Tool != "terminal-notifier" {
 		t.Errorf("expected default notification tool=terminal-notifier, got %q", cfg.Notifications.Tool)
 	}
-	if len(cfg.Providers.VSCode.Editors) == 0 {
-		t.Error("expected default VSCode editors to be non-empty")
+	if len(cfg.Providers.Editor.Editors) == 0 {
+		t.Error("expected default editor list to be non-empty")
 	}
 }
 
@@ -189,9 +189,9 @@ func TestValidate_InvalidNotificationTool(t *testing.T) {
 	}
 }
 
-func TestValidate_VSCodeMarketplace_Valid(t *testing.T) {
+func TestValidate_EditorMarketplace_Valid(t *testing.T) {
 	cfg := config.Defaults()
-	cfg.Providers.VSCode.Marketplace = map[string]string{
+	cfg.Providers.Editor.Marketplace = map[string]string{
 		"agy":    "vsmarketplace",
 		"cursor": "openvsx",
 	}
@@ -200,9 +200,9 @@ func TestValidate_VSCodeMarketplace_Valid(t *testing.T) {
 	}
 }
 
-func TestValidate_VSCodeMarketplace_Invalid(t *testing.T) {
+func TestValidate_EditorMarketplace_Invalid(t *testing.T) {
 	cfg := config.Defaults()
-	cfg.Providers.VSCode.Marketplace = map[string]string{
+	cfg.Providers.Editor.Marketplace = map[string]string{
 		"agy": "mymarketplace",
 	}
 	if err := config.Validate(cfg); err == nil {
@@ -210,10 +210,10 @@ func TestValidate_VSCodeMarketplace_Invalid(t *testing.T) {
 	}
 }
 
-func TestValidate_VSCodeMarketplace_Nil(t *testing.T) {
+func TestValidate_EditorMarketplace_Nil(t *testing.T) {
 	// nil Marketplace map (the default) should be valid.
 	cfg := config.Defaults()
-	cfg.Providers.VSCode.Marketplace = nil
+	cfg.Providers.Editor.Marketplace = nil
 	if err := config.Validate(cfg); err != nil {
 		t.Fatalf("unexpected error with nil marketplace map: %v", err)
 	}

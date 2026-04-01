@@ -139,7 +139,7 @@ func filterEnabledProviders(providers []provider.Provider, cfg *config.Config) [
 		"composer":   cfg.Providers.Composer.Enabled,
 		"pip":        cfg.Providers.Pip.Enabled,
 		"rust":       cfg.Providers.Rust.Enabled,
-		"vscode":     cfg.Providers.VSCode.Enabled,
+		"editor":     cfg.Providers.Editor.Enabled,
 		"omz":        cfg.Providers.Omz.Enabled,
 		"vim":        cfg.Providers.Vim.Enabled,
 		"vagrant":    cfg.Providers.Vagrant.Enabled,

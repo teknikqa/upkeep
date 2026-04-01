@@ -32,7 +32,7 @@ type ProvidersConfig struct {
 	Composer   ComposerConfig   `yaml:"composer"`
 	Pip        PipConfig        `yaml:"pip"`
 	Rust       RustConfig       `yaml:"rust"`
-	VSCode     VSCodeConfig     `yaml:"vscode"`
+	Editor     EditorConfig     `yaml:"editor"`
 	Omz        OmzConfig        `yaml:"omz"`
 	Vim        VimConfig        `yaml:"vim"`
 	Vagrant    VagrantConfig    `yaml:"vagrant"`
@@ -82,8 +82,8 @@ type RustConfig struct {
 	CargoInstallUpdate bool `yaml:"cargo_install_update"`
 }
 
-// VSCodeConfig configures the VS Code / multi-editor provider.
-type VSCodeConfig struct {
+// EditorConfig configures the code editor extension provider.
+type EditorConfig struct {
 	Enabled     bool              `yaml:"enabled"`
 	Editors     []string          `yaml:"editors"`
 	Timeout     int               `yaml:"timeout"`               // seconds per editor
@@ -160,7 +160,7 @@ func Defaults() *Config {
 				Rustup:             true,
 				CargoInstallUpdate: true,
 			},
-			VSCode: VSCodeConfig{
+			Editor: EditorConfig{
 				Enabled: true,
 				Editors: []string{"code", "cursor", "kiro", "windsurf", "agy"},
 				Timeout: 300,
@@ -286,12 +286,12 @@ func Validate(cfg *Config) error {
 	default:
 		return fmt.Errorf("notification tool must be one of: terminal-notifier, osascript; got %q", cfg.Notifications.Tool)
 	}
-	for editor, mp := range cfg.Providers.VSCode.Marketplace {
+	for editor, mp := range cfg.Providers.Editor.Marketplace {
 		switch mp {
 		case "vsmarketplace", "openvsx":
 			// valid
 		default:
-			return fmt.Errorf("vscode marketplace for %q must be \"vsmarketplace\" or \"openvsx\"; got %q", editor, mp)
+			return fmt.Errorf("editor marketplace for %q must be \"vsmarketplace\" or \"openvsx\"; got %q", editor, mp)
 		}
 	}
 	return nil

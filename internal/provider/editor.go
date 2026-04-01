@@ -10,26 +10,26 @@ import (
 	"github.com/teknikqa/upkeep/internal/marketplace"
 )
 
-// VSCodeProvider implements extension updates for VS Code and compatible editors.
-type VSCodeProvider struct {
-	cfg    config.VSCodeConfig
+// EditorProvider implements extension updates for VS Code and compatible editors.
+type EditorProvider struct {
+	cfg    config.EditorConfig
 	logger *logging.Logger
 }
 
-// NewVSCodeProvider creates a new VS Code provider.
-func NewVSCodeProvider(cfg config.VSCodeConfig, logger *logging.Logger) *VSCodeProvider {
-	return &VSCodeProvider{cfg: cfg, logger: logger}
+// NewEditorProvider creates a new code editor provider.
+func NewEditorProvider(cfg config.EditorConfig, logger *logging.Logger) *EditorProvider {
+	return &EditorProvider{cfg: cfg, logger: logger}
 }
 
-func (p *VSCodeProvider) Name() string        { return "vscode" }
-func (p *VSCodeProvider) DisplayName() string { return "VS Code / Editors" }
-func (p *VSCodeProvider) DependsOn() []string { return nil }
+func (p *EditorProvider) Name() string        { return "editor" }
+func (p *EditorProvider) DisplayName() string { return "VS Code / Editors" }
+func (p *EditorProvider) DependsOn() []string { return nil }
 
 // Scan checks which configured editors are installed and queries marketplace APIs
 // to detect which extensions are actually outdated.
 // If marketplace queries fail, Scan degrades gracefully: AlwaysUpdate ensures
 // Update() still runs --update-extensions even with no detected outdated items.
-func (p *VSCodeProvider) Scan(ctx context.Context) ScanResult {
+func (p *EditorProvider) Scan(ctx context.Context) ScanResult {
 	editors := p.cfg.Editors
 	if len(editors) == 0 {
 		editors = []string{"code", "cursor", "kiro", "windsurf", "agy"}
@@ -108,7 +108,7 @@ func (p *VSCodeProvider) Scan(ctx context.Context) ScanResult {
 // Update runs `<editor> --update-extensions` for each available editor with timeout.
 // Unlike other providers, this ignores items (Scan reports no outdated) and
 // discovers editors directly from config.
-func (p *VSCodeProvider) Update(ctx context.Context, _ []OutdatedItem) UpdateResult {
+func (p *EditorProvider) Update(ctx context.Context, _ []OutdatedItem) UpdateResult {
 	editors := p.cfg.Editors
 	if len(editors) == 0 {
 		editors = []string{"code", "cursor", "kiro", "windsurf", "agy"}
@@ -148,9 +148,9 @@ func (p *VSCodeProvider) Update(ctx context.Context, _ []OutdatedItem) UpdateRes
 	}
 }
 
-func (p *VSCodeProvider) logf(format string, args ...any) {
+func (p *EditorProvider) logf(format string, args ...any) {
 	if p.logger != nil {
-		p.logger.Warn("[vscode] "+format, args...)
+		p.logger.Warn("[editor] "+format, args...)
 	}
 }
 
@@ -197,7 +197,7 @@ func compareVersions(installed []marketplace.Extension, latest map[string]market
 }
 
 func init() {
-	Register(NewVSCodeProvider(config.VSCodeConfig{
+	Register(NewEditorProvider(config.EditorConfig{
 		Enabled: true,
 		Editors: []string{"code", "cursor", "kiro", "windsurf", "agy"},
 		Timeout: 300,

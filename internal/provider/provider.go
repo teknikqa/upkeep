@@ -22,7 +22,7 @@ type OutdatedItem struct {
 type ScanResult struct {
 	Available    bool           // is the tool installed on this system?
 	Outdated     []OutdatedItem // packages with updates available
-	AlwaysUpdate bool           // run Update even when Outdated is empty (e.g. vscode)
+	AlwaysUpdate bool           // run Update even when Outdated is empty (e.g. editor)
 	Error        error          // non-fatal scan error
 	Message      string         // human-readable status message
 }

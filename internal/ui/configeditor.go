@@ -176,7 +176,7 @@ func editProvidersSection(cfg *config.Config) error {
 			formatMenuLabel("Composer", cfg.Providers.Composer.Enabled),
 			formatMenuLabel("pip", cfg.Providers.Pip.Enabled),
 			formatMenuLabel("Rust", cfg.Providers.Rust.Enabled),
-			formatMenuLabel("VS Code", cfg.Providers.VSCode.Enabled),
+			formatMenuLabel("VS Code", cfg.Providers.Editor.Enabled),
 			formatMenuLabel("Oh My Zsh", cfg.Providers.Omz.Enabled),
 			formatMenuLabel("Vim", cfg.Providers.Vim.Enabled),
 			formatMenuLabel("Vagrant", cfg.Providers.Vagrant.Enabled),
@@ -220,7 +220,7 @@ func editProvidersSection(cfg *config.Config) error {
 				return err
 			}
 		case startsWith(choice, "VS Code"):
-			if err := editVSCodeProvider(cfg); err != nil {
+			if err := editEditorProvider(cfg); err != nil {
 				return err
 			}
 		case startsWith(choice, "Oh My Zsh"):
@@ -486,14 +486,14 @@ func editRustProvider(cfg *config.Config) error {
 	}
 }
 
-func editVSCodeProvider(cfg *config.Config) error {
+func editEditorProvider(cfg *config.Config) error {
 	for {
 		choice, err := pterm.DefaultInteractiveSelect.
 			WithDefaultText("VS Code Settings").
 			WithOptions([]string{
-				formatMenuLabel("Enabled", cfg.Providers.VSCode.Enabled),
-				formatMenuLabel("Editors", cfg.Providers.VSCode.Editors),
-				formatMenuLabel("Timeout", cfg.Providers.VSCode.Timeout),
+				formatMenuLabel("Enabled", cfg.Providers.Editor.Enabled),
+				formatMenuLabel("Editors", cfg.Providers.Editor.Editors),
+				formatMenuLabel("Timeout", cfg.Providers.Editor.Timeout),
 				"Back",
 			}).
 			Show()
@@ -504,23 +504,23 @@ func editVSCodeProvider(cfg *config.Config) error {
 		case choice == "Back":
 			return nil
 		case startsWith(choice, "Enabled"):
-			v, err := editBool("Enable VS Code", cfg.Providers.VSCode.Enabled)
+			v, err := editBool("Enable VS Code", cfg.Providers.Editor.Enabled)
 			if err != nil {
 				return err
 			}
-			cfg.Providers.VSCode.Enabled = v
+			cfg.Providers.Editor.Enabled = v
 		case startsWith(choice, "Editors"):
-			v, err := editStringSlice("Editor executables", cfg.Providers.VSCode.Editors)
+			v, err := editStringSlice("Editor executables", cfg.Providers.Editor.Editors)
 			if err != nil {
 				return err
 			}
-			cfg.Providers.VSCode.Editors = v
+			cfg.Providers.Editor.Editors = v
 		case startsWith(choice, "Timeout"):
-			v, err := editInt("Timeout (seconds)", cfg.Providers.VSCode.Timeout, 1, 3600)
+			v, err := editInt("Timeout (seconds)", cfg.Providers.Editor.Timeout, 1, 3600)
 			if err != nil {
 				return err
 			}
-			cfg.Providers.VSCode.Timeout = v
+			cfg.Providers.Editor.Timeout = v
 		}
 	}
 }
@@ -670,7 +670,7 @@ func copyConfig(cfg *config.Config) *config.Config {
 	c.Providers.BrewCask.Skip = copyStringSlice(cfg.Providers.BrewCask.Skip)
 	c.Providers.BrewCask.AuthOverrides = copyStringBoolMap(cfg.Providers.BrewCask.AuthOverrides)
 	c.Providers.Npm.Skip = copyStringSlice(cfg.Providers.Npm.Skip)
-	c.Providers.VSCode.Editors = copyStringSlice(cfg.Providers.VSCode.Editors)
+	c.Providers.Editor.Editors = copyStringSlice(cfg.Providers.Editor.Editors)
 	return &c
 }
 

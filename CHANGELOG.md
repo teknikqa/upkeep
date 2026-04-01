@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING**: Renamed `vscode` provider to `editor` — config key `vscode:` is now `editor:`, CLI argument `upkeep vscode` is now `upkeep editor`
+
 ## [0.2.0] - 2026-03-31
 
 ### Added
