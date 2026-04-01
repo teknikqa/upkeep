@@ -4,6 +4,7 @@ package ui
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -15,22 +16,25 @@ import (
 
 // providerUpdateState tracks live progress for a single provider.
 type providerUpdateState struct {
-	status       string // "pending" | "updating" | "success" | "partial" | "failed" | "unavailable"
-	updatedCount int
-	failedCount  int
-	duration     time.Duration
+	status        string // "pending" | "updating" | "success" | "partial" | "failed" | "unavailable"
+	updatedCount  int
+	deferredCount int
+	skippedCount  int
+	failedCount   int
+	duration      time.Duration
 }
 
 // LiveUpdateTable renders the scan summary table as a live-updating view during
 // the update phase. On TTY it uses pterm's AreaPrinter to overwrite the table
 // in-place; on non-TTY it falls back to per-completion StatusLine output.
 type LiveUpdateTable struct {
-	rows    []ScanSummaryRow // immutable initial scan data
-	states  map[string]*providerUpdateState
-	mu      sync.Mutex
-	area    *pterm.AreaPrinter // nil in non-TTY mode
-	writer  io.Writer          // for non-TTY fallback output
-	stopped bool
+	rows          []ScanSummaryRow // immutable initial scan data
+	states        map[string]*providerUpdateState
+	mu            sync.Mutex
+	area          *pterm.AreaPrinter // nil in non-TTY mode
+	writer        io.Writer          // for non-TTY fallback output
+	stopped       bool
+	totalDuration time.Duration
 }
 
 // NewLiveUpdateTable creates a LiveUpdateTable from the scan summary rows.
@@ -104,6 +108,8 @@ func (t *LiveUpdateTable) OnProviderComplete(name string, result provider.Update
 	}
 
 	s.updatedCount = len(result.Updated)
+	s.deferredCount = len(result.Deferred)
+	s.skippedCount = len(result.Skipped)
 	s.failedCount = len(result.Failed)
 	s.duration = result.Duration
 
@@ -122,12 +128,19 @@ func (t *LiveUpdateTable) OnProviderComplete(name string, result provider.Update
 		t.render()
 	} else {
 		// Non-TTY fallback: emit a StatusLine to the writer.
-		StatusLine(t.writer, t.displayNameFor(name), s.status, s.updatedCount, len(result.Deferred), s.failedCount, s.duration)
+		StatusLine(t.writer, t.displayNameFor(name), s.status, s.updatedCount, s.deferredCount, s.skippedCount, s.failedCount, s.duration)
 	}
 }
 
-// Stop finalises the AreaPrinter, leaving the last-rendered table on screen.
-// Safe to call multiple times.
+// SetTotalDuration records the overall update duration for display on Stop.
+func (t *LiveUpdateTable) SetTotalDuration(d time.Duration) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.totalDuration = d
+}
+
+// Stop finalises the AreaPrinter, leaving the last-rendered table on screen,
+// and prints the total duration line below. Safe to call multiple times.
 func (t *LiveUpdateTable) Stop() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -144,6 +157,10 @@ func (t *LiveUpdateTable) Stop() {
 			// Ignore stop errors — best effort.
 			_ = err
 		}
+		fmt.Fprintf(os.Stdout, "\nTotal duration: %s\n", t.totalDuration.Round(time.Millisecond))
+	} else {
+		// Non-TTY: print total duration to writer.
+		fmt.Fprintf(t.writer, "\nTotal duration: %s\n", t.totalDuration.Round(time.Millisecond))
 	}
 }
 
@@ -156,11 +173,17 @@ func (t *LiveUpdateTable) render() {
 
 	tw := termWidth()
 
-	// Build intermediate rows — same logic as RenderScanSummaryTable.
+	// Build intermediate rows — same logic as RenderScanSummaryTable but with
+	// report columns (Updated, Deferred, Skipped, Failed, Duration).
 	type iRow struct {
 		provider string
 		status   string
 		outdated string
+		upd      string
+		def      string
+		skip     string
+		fail     string
+		dur      string
 		packages []string
 	}
 	var intermediate []iRow
@@ -169,18 +192,19 @@ func (t *LiveUpdateTable) render() {
 		s := t.states[r.ProviderName]
 
 		status, outdated := t.rowStatusAndOutdated(r, s)
+		upd, def, skip, fail, dur := t.reportColumns(s)
 
 		if len(r.PackageGroups) > 0 {
-			intermediate = append(intermediate, iRow{r.DisplayName, status, outdated, nil})
+			intermediate = append(intermediate, iRow{r.DisplayName, status, outdated, upd, def, skip, fail, dur, nil})
 			for _, sub := range GroupSubRows(r.PackageGroups) {
-				// For sub-rows, carry the parent status and show per-group count.
+				// Sub-rows: carry parent status, show per-group count, blank report cols.
 				intermediate = append(intermediate, iRow{
-					sub.Label, status, fmt.Sprintf("%d", sub.Count), sub.PkgNames,
+					sub.Label, status, fmt.Sprintf("%d", sub.Count), "", "", "", "", "", sub.PkgNames,
 				})
 			}
 		} else {
 			intermediate = append(intermediate, iRow{
-				r.DisplayName, status, outdated, r.Packages,
+				r.DisplayName, status, outdated, upd, def, skip, fail, dur, r.Packages,
 			})
 		}
 	}
@@ -189,6 +213,11 @@ func (t *LiveUpdateTable) render() {
 	provW := len("Provider")
 	statusW := len("Status")
 	outdatedW := len("Outdated")
+	updW := len("Upd")
+	defW := len("Def")
+	skipW := len("Skip")
+	failW := len("Fail")
+	durW := len("Dur")
 	for _, ir := range intermediate {
 		if len(ir.provider) > provW {
 			provW = len(ir.provider)
@@ -199,22 +228,39 @@ func (t *LiveUpdateTable) render() {
 		if len(ir.outdated) > outdatedW {
 			outdatedW = len(ir.outdated)
 		}
+		if len(ir.upd) > updW {
+			updW = len(ir.upd)
+		}
+		if len(ir.def) > defW {
+			defW = len(ir.def)
+		}
+		if len(ir.skip) > skipW {
+			skipW = len(ir.skip)
+		}
+		if len(ir.fail) > failW {
+			failW = len(ir.fail)
+		}
+		if len(ir.dur) > durW {
+			durW = len(ir.dur)
+		}
 	}
 
-	prefixWidth := provW + statusW + outdatedW + 9
+	// pterm uses " | " (3 chars) between each column pair.
+	// 9 columns → 8 separators × 3 = 24.
+	prefixWidth := provW + statusW + outdatedW + updW + defW + skipW + failW + durW + 24
 	maxPkgWidth := tw - prefixWidth
 	if maxPkgWidth < 10 {
 		maxPkgWidth = 10
 	}
 
 	data := pterm.TableData{
-		{"Provider", "Status", "Outdated", "Packages"},
+		{"Provider", "Status", "Outdated", "Upd", "Def", "Skip", "Fail", "Dur", "Packages"},
 	}
 	for _, ir := range intermediate {
 		pkgLines := WrapPackages(ir.packages, maxPkgWidth)
-		data = append(data, []string{ir.provider, ir.status, ir.outdated, pkgLines[0]})
+		data = append(data, []string{ir.provider, ir.status, ir.outdated, ir.upd, ir.def, ir.skip, ir.fail, ir.dur, pkgLines[0]})
 		for _, cont := range pkgLines[1:] {
-			data = append(data, []string{"", "", "", cont})
+			data = append(data, []string{"", "", "", "", "", "", "", "", cont})
 		}
 	}
 
@@ -231,6 +277,24 @@ func (t *LiveUpdateTable) render() {
 	}
 
 	t.area.Update(strings.TrimRight(sb.String(), "\n"))
+}
+
+// reportColumns returns the 5 report column strings for a provider state.
+// Returns "—" for pending/updating providers and actual values for completed ones.
+func (t *LiveUpdateTable) reportColumns(s *providerUpdateState) (upd, def, skip, fail, dur string) {
+	if s == nil {
+		return "—", "—", "—", "—", "—"
+	}
+	switch s.status {
+	case "pending", "updating", "unavailable":
+		return "—", "—", "—", "—", "—"
+	default: // "success", "partial", "failed"
+		return fmt.Sprintf("%d", s.updatedCount),
+			fmt.Sprintf("%d", s.deferredCount),
+			fmt.Sprintf("%d", s.skippedCount),
+			fmt.Sprintf("%d", s.failedCount),
+			s.duration.Round(time.Millisecond).String()
+	}
 }
 
 // rowStatusAndOutdated returns the Status and Outdated column strings for a row.

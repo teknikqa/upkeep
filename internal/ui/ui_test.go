@@ -46,30 +46,9 @@ func TestRenderScanSummaryTable_WithRows(t *testing.T) {
 	ui.RenderScanSummaryTable(rows)
 }
 
-func TestRenderFinalReport_NoPanic(t *testing.T) {
-	rows := []ui.UpdateSummaryRow{
-		{
-			ProviderName: "brew",
-			DisplayName:  "Homebrew Formulae",
-			Updated:      3,
-			Duration:     45 * time.Second,
-			Status:       "success",
-		},
-		{
-			ProviderName: "brew-cask",
-			DisplayName:  "Homebrew Casks",
-			Updated:      2,
-			Deferred:     1,
-			Duration:     30 * time.Second,
-			Status:       "partial",
-		},
-	}
-	ui.RenderFinalReport(rows, 75*time.Second)
-}
-
 func TestStatusLine_Output(t *testing.T) {
 	var buf bytes.Buffer
-	ui.StatusLine(&buf, "Homebrew Formulae", "success", 3, 0, 0, 45*time.Second)
+	ui.StatusLine(&buf, "Homebrew Formulae", "success", 3, 0, 0, 0, 45*time.Second)
 	out := buf.String()
 	if !strings.Contains(out, "Homebrew Formulae") {
 		t.Errorf("expected output to contain 'Homebrew Formulae', got %q", out)

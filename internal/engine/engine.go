@@ -157,9 +157,10 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 			liveTable.OnProviderComplete(name, result)
 		},
 	})
-	liveTable.Stop()
 
 	totalDuration := time.Since(runStart)
+	liveTable.SetTotalDuration(totalDuration)
+	liveTable.Stop()
 
 	// Phase 6: Save state.
 	e.state.LastRun = time.Now()
@@ -206,10 +207,6 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 	if saveErr := e.state.Save(); saveErr != nil {
 		e.logger.Warn("failed to save state: %v", saveErr)
 	}
-
-	// Phase 7: Report.
-	reports := BuildReport(providers, scanResults, updateResults)
-	PrintReport(out, reports, totalDuration)
 
 	return nil
 }

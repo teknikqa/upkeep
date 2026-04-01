@@ -233,3 +233,45 @@ var errFakeFailure = fakeError("fake provider failure")
 type fakeError string
 
 func (e fakeError) Error() string { return string(e) }
+
+// TestLiveUpdateTable_Stop_PrintsTotalDuration verifies that Stop() prints the
+// total duration in non-TTY mode.
+func TestLiveUpdateTable_Stop_PrintsTotalDuration(t *testing.T) {
+	var buf bytes.Buffer
+	rows := testScanRows()
+	lt := ui.NewLiveUpdateTable(rows, 0, &buf)
+
+	lt.OnProviderComplete("brew", provider.UpdateResult{
+		Updated:  []string{"git"},
+		Duration: time.Second,
+	})
+	lt.SetTotalDuration(5 * time.Second)
+	lt.Stop()
+
+	out := buf.String()
+	if !strings.Contains(out, "Total duration: 5s") {
+		t.Errorf("expected 'Total duration: 5s' in output, got: %q", out)
+	}
+}
+
+// TestLiveUpdateTable_NonTTY_Skipped verifies that the skipped count appears
+// in non-TTY StatusLine output.
+func TestLiveUpdateTable_NonTTY_Skipped(t *testing.T) {
+	var buf bytes.Buffer
+	rows := []ui.ScanSummaryRow{
+		{ProviderName: "brew", DisplayName: "Homebrew", OutdatedCount: 3, Packages: []string{"git", "jq", "rg"}, Available: true},
+	}
+	lt := ui.NewLiveUpdateTable(rows, 0, &buf)
+
+	lt.OnProviderComplete("brew", provider.UpdateResult{
+		Updated:  []string{"git"},
+		Skipped:  []string{"jq", "rg"},
+		Duration: time.Second,
+	})
+	lt.Stop()
+
+	out := buf.String()
+	if !strings.Contains(out, "skipped=2") {
+		t.Errorf("expected 'skipped=2' in output, got: %q", out)
+	}
+}

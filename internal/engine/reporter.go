@@ -1,11 +1,9 @@
 package engine
 
 import (
-	"io"
 	"time"
 
 	"github.com/teknikqa/upkeep/internal/provider"
-	"github.com/teknikqa/upkeep/internal/ui"
 )
 
 // ProviderReport holds the aggregated outcome for one provider.
@@ -70,27 +68,6 @@ func BuildReport(
 		reports = append(reports, r)
 	}
 	return reports
-}
-
-// PrintReport writes a final summary table.
-// Per-provider status lines are now shown in the LiveUpdateTable during execution.
-func PrintReport(w io.Writer, reports []ProviderReport, totalDuration time.Duration) {
-	// Summary table.
-	rows := make([]ui.UpdateSummaryRow, 0, len(reports))
-	for _, r := range reports {
-		rows = append(rows, ui.UpdateSummaryRow{
-			ProviderName: r.Name,
-			DisplayName:  r.DisplayName,
-			Updated:      r.Updated,
-			Deferred:     r.Deferred,
-			Skipped:      r.Skipped,
-			Failed:       r.Failed,
-			Duration:     r.Duration,
-			Status:       r.Status,
-			Error:        r.Error,
-		})
-	}
-	ui.RenderFinalReport(rows, totalDuration)
 }
 
 // SummaryCounts returns total updated/deferred/skipped/failed across all reports.

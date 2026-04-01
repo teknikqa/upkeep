@@ -87,19 +87,6 @@ type ScanSummaryRow struct {
 	Error         error
 }
 
-// UpdateSummaryRow represents one row in the final update report.
-type UpdateSummaryRow struct {
-	ProviderName string
-	DisplayName  string
-	Updated      int
-	Deferred     int
-	Skipped      int
-	Failed       int
-	Duration     time.Duration
-	Status       string // "success" | "partial" | "failed" | "skipped" | "unavailable"
-	Error        error
-}
-
 // RenderScanSummaryTable renders a pre-update scan summary table to stdout.
 // When a row has PackageGroups, it renders a parent row (total count, no packages)
 // followed by indented sub-rows per group (group count + packages).
@@ -240,50 +227,14 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) int {
 	return 0
 }
 
-// RenderFinalReport renders the final update report table.
-func RenderFinalReport(rows []UpdateSummaryRow, totalDuration time.Duration) {
-	fmt.Println()
-	if IsTTY() {
-		data := pterm.TableData{
-			{"Provider", "Status", "Updated", "Deferred", "Skipped", "Failed", "Duration"},
-		}
-		for _, r := range rows {
-			emoji := statusEmoji(r.Status)
-			data = append(data, []string{
-				r.DisplayName,
-				emoji + " " + r.Status,
-				fmt.Sprintf("%d", r.Updated),
-				fmt.Sprintf("%d", r.Deferred),
-				fmt.Sprintf("%d", r.Skipped),
-				fmt.Sprintf("%d", r.Failed),
-				r.Duration.Round(time.Millisecond).String(),
-			})
-		}
-		rendered, _ := pterm.DefaultTable.WithHasHeader().WithData(data).Srender()
-		for _, line := range strings.Split(strings.TrimRight(rendered, "\n"), "\n") {
-			fmt.Println(trailingPadRe.ReplaceAllString(line, ""))
-		}
-	} else {
-		fmt.Printf("%-20s %-12s %-8s %-8s %-8s %-8s %s\n",
-			"Provider", "Status", "Updated", "Deferred", "Skipped", "Failed", "Duration")
-		for _, r := range rows {
-			fmt.Printf("%-20s %-12s %-8d %-8d %-8d %-8d %s\n",
-				r.DisplayName, r.Status,
-				r.Updated, r.Deferred, r.Skipped, r.Failed,
-				r.Duration.Round(time.Millisecond).String())
-		}
-	}
-	fmt.Printf("\nTotal duration: %s\n", totalDuration.Round(time.Millisecond).String())
-}
-
 // StatusLine prints a single provider status line.
-func StatusLine(w io.Writer, displayName, status string, updated, deferred, failed int, duration time.Duration) {
+func StatusLine(w io.Writer, displayName, status string, updated, deferred, skipped, failed int, duration time.Duration) {
 	emoji := statusEmoji(status)
 	if w == nil {
 		w = os.Stdout
 	}
-	fmt.Fprintf(w, "%s %-20s  updated=%d  deferred=%d  failed=%d  (%s)\n",
-		emoji, displayName, updated, deferred, failed, duration.Round(time.Millisecond).String())
+	fmt.Fprintf(w, "%s %-20s  updated=%d  deferred=%d  skipped=%d  failed=%d  (%s)\n",
+		emoji, displayName, updated, deferred, skipped, failed, duration.Round(time.Millisecond).String())
 }
 
 // ProgressBar creates a deterministic progress bar for N providers.
