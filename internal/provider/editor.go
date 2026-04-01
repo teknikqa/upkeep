@@ -22,7 +22,7 @@ func NewEditorProvider(cfg config.EditorConfig, logger *logging.Logger) *EditorP
 }
 
 func (p *EditorProvider) Name() string        { return "editor" }
-func (p *EditorProvider) DisplayName() string { return "VS Code / Editors" }
+func (p *EditorProvider) DisplayName() string { return "Code Editor Extensions" }
 func (p *EditorProvider) DependsOn() []string { return nil }
 
 // Scan checks which configured editors are installed and queries marketplace APIs

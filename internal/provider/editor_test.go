@@ -15,8 +15,8 @@ func TestEditorProvider_Name(t *testing.T) {
 	if p.Name() != "editor" {
 		t.Errorf("expected %q, got %q", "editor", p.Name())
 	}
-	if p.DisplayName() != "VS Code / Editors" {
-		t.Errorf("expected %q, got %q", "VS Code / Editors", p.DisplayName())
+	if p.DisplayName() != "Code Editor Extensions" {
+		t.Errorf("expected %q, got %q", "Code Editor Extensions", p.DisplayName())
 	}
 }
 
