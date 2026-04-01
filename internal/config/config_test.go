@@ -189,6 +189,36 @@ func TestValidate_InvalidNotificationTool(t *testing.T) {
 	}
 }
 
+func TestValidate_VSCodeMarketplace_Valid(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Providers.VSCode.Marketplace = map[string]string{
+		"agy":    "vsmarketplace",
+		"cursor": "openvsx",
+	}
+	if err := config.Validate(cfg); err != nil {
+		t.Fatalf("unexpected error for valid marketplace overrides: %v", err)
+	}
+}
+
+func TestValidate_VSCodeMarketplace_Invalid(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Providers.VSCode.Marketplace = map[string]string{
+		"agy": "mymarketplace",
+	}
+	if err := config.Validate(cfg); err == nil {
+		t.Fatal("expected error for invalid marketplace value")
+	}
+}
+
+func TestValidate_VSCodeMarketplace_Nil(t *testing.T) {
+	// nil Marketplace map (the default) should be valid.
+	cfg := config.Defaults()
+	cfg.Providers.VSCode.Marketplace = nil
+	if err := config.Validate(cfg); err != nil {
+		t.Fatalf("unexpected error with nil marketplace map: %v", err)
+	}
+}
+
 func TestSave_WritesValidConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")

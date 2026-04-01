@@ -2,10 +2,12 @@ package provider
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/teknikqa/upkeep/internal/config"
 	"github.com/teknikqa/upkeep/internal/logging"
+	"github.com/teknikqa/upkeep/internal/marketplace"
 )
 
 // VSCodeProvider implements extension updates for VS Code and compatible editors.
@@ -23,9 +25,10 @@ func (p *VSCodeProvider) Name() string        { return "vscode" }
 func (p *VSCodeProvider) DisplayName() string { return "VS Code / Editors" }
 func (p *VSCodeProvider) DependsOn() []string { return nil }
 
-// Scan checks which configured editors are installed.
-// Extensions cannot be checked for outdated status without marketplace APIs,
-// so Scan reports zero outdated. Update() discovers editors independently.
+// Scan checks which configured editors are installed and queries marketplace APIs
+// to detect which extensions are actually outdated.
+// If marketplace queries fail, Scan degrades gracefully: AlwaysUpdate ensures
+// Update() still runs --update-extensions even with no detected outdated items.
 func (p *VSCodeProvider) Scan(ctx context.Context) ScanResult {
 	editors := p.cfg.Editors
 	if len(editors) == 0 {
@@ -33,17 +36,73 @@ func (p *VSCodeProvider) Scan(ctx context.Context) ScanResult {
 	}
 
 	found := false
+	var allOutdated []OutdatedItem
+
+	// Create marketplace clients (reused across editors with the same marketplace).
+	httpClient := marketplace.DefaultHTTPClient()
+	clients := map[marketplace.MarketplaceType]marketplace.Client{
+		marketplace.VSMarketplace: marketplace.NewVSMarketplaceClient(httpClient),
+		marketplace.OpenVSX:       marketplace.NewOpenVSXClient(httpClient),
+	}
+
 	for _, editor := range editors {
-		if CommandExists(editor) {
-			found = true
-			break
+		if !CommandExists(editor) {
+			continue
 		}
+		found = true
+
+		// List installed extensions with versions.
+		stdout, _, err := RunCommand(ctx, editor, "--list-extensions", "--show-versions")
+		if err != nil {
+			p.logf("%s --list-extensions error: %v", editor, err)
+			continue
+		}
+
+		installed := parseExtensionList(stdout)
+		if len(installed) == 0 {
+			continue
+		}
+
+		// Determine marketplace for this editor (config override takes precedence).
+		mpType := marketplace.EditorMarketplace(editor)
+		if override, ok := p.cfg.Marketplace[editor]; ok {
+			mpType = marketplace.MarketplaceType(override)
+		}
+
+		client, ok := clients[mpType]
+		if !ok {
+			p.logf("unknown marketplace type %q for editor %s", mpType, editor)
+			continue
+		}
+
+		// Collect extension IDs for batch query.
+		ids := make([]string, len(installed))
+		for i, ext := range installed {
+			ids[i] = ext.ID
+		}
+
+		// Query marketplace for latest versions.
+		latest, err := client.GetLatestVersions(ctx, ids)
+		if err != nil {
+			p.logf("%s marketplace query error: %v (falling back to update-all)", editor, err)
+			continue
+		}
+
+		// Compare installed vs latest and accumulate outdated items.
+		allOutdated = append(allOutdated, compareVersions(installed, latest)...)
 	}
 
 	if !found {
 		return ScanResult{Available: false, Message: "no editors found"}
 	}
-	return ScanResult{Available: true, AlwaysUpdate: true}
+
+	// AlwaysUpdate: true ensures Update() runs --update-extensions even if
+	// marketplace queries fail and Outdated is empty.
+	return ScanResult{
+		Available:    true,
+		Outdated:     allOutdated,
+		AlwaysUpdate: true,
+	}
 }
 
 // Update runs `<editor> --update-extensions` for each available editor with timeout.
@@ -93,6 +152,48 @@ func (p *VSCodeProvider) logf(format string, args ...any) {
 	if p.logger != nil {
 		p.logger.Warn("[vscode] "+format, args...)
 	}
+}
+
+// parseExtensionList parses the output of `<editor> --list-extensions --show-versions`.
+// Each line is expected to be in "publisher.extension@version" format.
+// Lines that don't match are silently skipped.
+func parseExtensionList(output string) []marketplace.Extension {
+	var extensions []marketplace.Extension
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		atIdx := strings.LastIndex(line, "@")
+		if atIdx <= 0 {
+			continue
+		}
+		extensions = append(extensions, marketplace.Extension{
+			ID:      strings.ToLower(line[:atIdx]),
+			Version: line[atIdx+1:],
+		})
+	}
+	return extensions
+}
+
+// compareVersions takes installed extensions and marketplace latest versions,
+// returns OutdatedItems for extensions where local version differs from marketplace.
+func compareVersions(installed []marketplace.Extension, latest map[string]marketplace.LatestVersion) []OutdatedItem {
+	var outdated []OutdatedItem
+	for _, ext := range installed {
+		lv, ok := latest[ext.ID]
+		if !ok || !lv.Found {
+			continue // not in marketplace (private/local), skip
+		}
+		if lv.Version != ext.Version {
+			outdated = append(outdated, OutdatedItem{
+				Name:           ext.ID,
+				CurrentVersion: ext.Version,
+				LatestVersion:  lv.Version,
+			})
+		}
+	}
+	return outdated
 }
 
 func init() {

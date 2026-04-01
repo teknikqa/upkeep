@@ -1,6 +1,10 @@
 package provider
 
-import "context"
+import (
+	"context"
+
+	"github.com/teknikqa/upkeep/internal/marketplace"
+)
 
 // ExportNewRegistry exposes newRegistry for testing purposes.
 func ExportNewRegistry() *Registry {
@@ -90,4 +94,14 @@ func ParseVagrantVersion(output string) (installed, latest string) {
 func ParseVirtualBoxVersion(output string) string {
 	p := &VirtualBoxProvider{}
 	return p.stripBuildSuffix(output)
+}
+
+// ParseExtensionList exposes parseExtensionList for testing.
+func ParseExtensionList(output string) []marketplace.Extension {
+	return parseExtensionList(output)
+}
+
+// CompareVersions exposes compareVersions for testing.
+func CompareVersions(installed []marketplace.Extension, latest map[string]marketplace.LatestVersion) []OutdatedItem {
+	return compareVersions(installed, latest)
 }

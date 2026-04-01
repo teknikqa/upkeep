@@ -84,9 +84,10 @@ type RustConfig struct {
 
 // VSCodeConfig configures the VS Code / multi-editor provider.
 type VSCodeConfig struct {
-	Enabled bool     `yaml:"enabled"`
-	Editors []string `yaml:"editors"`
-	Timeout int      `yaml:"timeout"` // seconds per editor
+	Enabled     bool              `yaml:"enabled"`
+	Editors     []string          `yaml:"editors"`
+	Timeout     int               `yaml:"timeout"`               // seconds per editor
+	Marketplace map[string]string `yaml:"marketplace,omitempty"` // editor → "vsmarketplace" | "openvsx"
 }
 
 // OmzConfig configures the Oh My Zsh provider.
@@ -284,6 +285,14 @@ func Validate(cfg *Config) error {
 		// valid
 	default:
 		return fmt.Errorf("notification tool must be one of: terminal-notifier, osascript; got %q", cfg.Notifications.Tool)
+	}
+	for editor, mp := range cfg.Providers.VSCode.Marketplace {
+		switch mp {
+		case "vsmarketplace", "openvsx":
+			// valid
+		default:
+			return fmt.Errorf("vscode marketplace for %q must be \"vsmarketplace\" or \"openvsx\"; got %q", editor, mp)
+		}
 	}
 	return nil
 }
