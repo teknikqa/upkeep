@@ -118,7 +118,8 @@ func TestVSMarketplace_SkipsPreRelease(t *testing.T) {
 		}
 		_ = json.Unmarshal(body, &req)
 
-		if req.Flags == 0x2|0x80|0x10 {
+		switch req.Flags {
+		case 0x2 | 0x80 | 0x10:
 			// Phase 1 (flags=146): latest version is a pre-release.
 			_, _ = w.Write([]byte(`{"results":[{"extensions":[{
 				"extensionName":"vscode-yaml",
@@ -128,7 +129,7 @@ func TestVSMarketplace_SkipsPreRelease(t *testing.T) {
 					"properties":[{"key":"Microsoft.VisualStudio.Code.PreRelease","value":"true"}]
 				}]
 			}]}]}`))
-		} else if req.Flags == 0x2|0x10 {
+		case 0x2 | 0x10:
 			// Phase 2 (flags=18): all versions — first is pre-release, second is stable.
 			_, _ = w.Write([]byte(`{"results":[{"extensions":[{
 				"extensionName":"vscode-yaml",
@@ -138,9 +139,9 @@ func TestVSMarketplace_SkipsPreRelease(t *testing.T) {
 					{"version":"1.21.0","properties":[]}
 				]
 			}]}]}`))
-		} else {
+		default:
 			t.Errorf("unexpected flags: %d", req.Flags)
-			w.Write([]byte(`{"results":[]}`))
+			_, _ = w.Write([]byte(`{"results":[]}`))
 		}
 	}))
 	defer srv.Close()

@@ -7,6 +7,12 @@ GOFLAGS  :=
 .PHONY: all
 all: build
 
+# Set up development environment (git hooks, etc.)
+.PHONY: setup
+setup:
+	@ln -sf ../../.git-hooks/pre-commit .git/hooks/pre-commit
+	@echo "Git hooks installed (.git-hooks → .git/hooks)"
+
 # Build the binary in the current directory
 .PHONY: build
 build:
