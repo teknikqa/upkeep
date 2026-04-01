@@ -47,6 +47,23 @@ jobs:
         with:
           go-version: "1.24"
 
+      - name: Check formatting
+        run: |
+          UNFORMATTED=$(gofmt -l .)
+          if [ -n "$UNFORMATTED" ]; then
+            echo "::error::Files not formatted with gofmt:"
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+
+      - name: Check go mod tidy
+        run: |
+          go mod tidy
+          if ! git diff --exit-code go.mod go.sum; then
+            echo "::error::go.mod or go.sum is not tidy — run 'go mod tidy'"
+            exit 1
+          fi
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
@@ -54,3 +71,12 @@ jobs:
 
       - name: go vet
         run: go vet ./...
+
+  typos:
+    name: Spell Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check spelling
+        uses: crate-ci/typos@master

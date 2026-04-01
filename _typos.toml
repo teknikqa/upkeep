@@ -1,0 +1,11 @@
+[default]
+extend-ignore-re = [
+    # Hex flag values in comments/code
+    "0x[0-9a-fA-F]+",
+]
+
+[files]
+extend-exclude = [
+    "go.sum",
+    "*.gif",
+]

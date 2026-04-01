@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Commit-msg hook: enforces Conventional Commits format.
+# See: https://www.conventionalcommits.org/
+set -euo pipefail
+
+MSG_FILE="$1"
+MSG=$(head -1 "$MSG_FILE")
+
+# Allow merge commits and fixup/squash commits.
+if [[ "$MSG" =~ ^Merge\  ]] || [[ "$MSG" =~ ^fixup!\  ]] || [[ "$MSG" =~ ^squash!\  ]]; then
+    exit 0
+fi
+
+# Conventional Commits: type(optional-scope): description
+# Types: feat, fix, chore, refactor, docs, test, ci, style, perf, build, revert
+PATTERN='^(feat|fix|chore|refactor|docs|test|ci|style|perf|build|revert)(\([a-z0-9._-]+\))?!?: .+'
+
+if ! [[ "$MSG" =~ $PATTERN ]]; then
+    printf 'ERROR: commit message does not follow Conventional Commits format.\n\n'
+    printf 'Expected: type(scope): description\n'
+    printf 'Types:    feat, fix, chore, refactor, docs, test, ci, style, perf, build, revert\n'
+    printf 'Examples:\n'
+    printf '  feat(editor): add pre-release version detection\n'
+    printf '  fix: handle nil pointer in scan result\n'
+    printf '  chore(deps): bump golang.org/x/mod to v0.18.0\n\n'
+    printf 'Got: %s\n' "$MSG"
+    exit 1
+fi

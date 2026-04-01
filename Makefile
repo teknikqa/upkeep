@@ -11,6 +11,7 @@ all: build
 .PHONY: setup
 setup:
 	@ln -sf ../../.git-hooks/pre-commit .git/hooks/pre-commit
+	@ln -sf ../../.git-hooks/commit-msg .git/hooks/commit-msg
 	@echo "Git hooks installed (.git-hooks → .git/hooks)"
 
 # Build the binary in the current directory

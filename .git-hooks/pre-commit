@@ -15,11 +15,21 @@ printf '==> pre-commit: checking staged Go files\n'
 gofmt -w $STAGED_GO
 git add $STAGED_GO
 
-# 2. go vet
+# 2. Check go.mod/go.sum are tidy (only if they're staged or Go files changed).
+printf '==> go mod tidy\n'
+cp go.mod go.mod.bak && cp go.sum go.sum.bak
+go mod tidy
+if ! diff -q go.mod go.mod.bak >/dev/null 2>&1 || ! diff -q go.sum go.sum.bak >/dev/null 2>&1; then
+    git add go.mod go.sum
+    printf '    auto-tidied go.mod/go.sum\n'
+fi
+rm -f go.mod.bak go.sum.bak
+
+# 3. go vet
 printf '==> go vet ./...\n'
 go vet ./...
 
-# 3. golangci-lint (skip gracefully if not installed).
+# 4. golangci-lint (skip gracefully if not installed).
 if command -v golangci-lint >/dev/null 2>&1; then
     printf '==> golangci-lint run\n'
     golangci-lint run
@@ -27,7 +37,7 @@ else
     printf '==> golangci-lint not found — skipping (install: https://golangci-lint.run/docs/install/)\n'
 fi
 
-# 4. Tests
+# 5. Tests
 printf '==> go test ./...\n'
 go test ./... -timeout 120s
 
