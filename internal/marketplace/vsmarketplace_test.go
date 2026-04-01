@@ -2,6 +2,8 @@ package marketplace_test
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,12 +17,12 @@ const vsMarketplaceSampleResponse = `{
       {
         "extensionName": "vscode-eslint",
         "publisher": {"publisherName": "dbaeumer"},
-        "versions": [{"version": "2.4.4"}]
+        "versions": [{"version": "2.4.4", "properties": []}]
       },
       {
         "extensionName": "prettier-vscode",
         "publisher": {"publisherName": "esbenp"},
-        "versions": [{"version": "10.2.0"}]
+        "versions": [{"version": "10.2.0", "properties": []}]
       }
     ]
   }]
@@ -96,6 +98,147 @@ func TestVSMarketplace_RateLimited(t *testing.T) {
 	_, err := client.GetLatestVersions(context.Background(), []string{"pub.ext"})
 	if err == nil {
 		t.Error("expected error on HTTP 429, got nil")
+	}
+}
+
+// TestVSMarketplace_SkipsPreRelease verifies the two-phase query: when the phase-1 response
+// contains a pre-release latest version, the client fires a phase-2 request and returns the
+// latest stable version with LatestPreReleaseVersion populated.
+func TestVSMarketplace_SkipsPreRelease(t *testing.T) {
+	requestCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+		// Distinguish phase-1 vs phase-2 by the flags in the request body.
+		body, _ := io.ReadAll(r.Body)
+		var req struct {
+			Flags int `json:"flags"`
+		}
+		_ = json.Unmarshal(body, &req)
+
+		if req.Flags == 0x2|0x80|0x10 {
+			// Phase 1 (flags=146): latest version is a pre-release.
+			_, _ = w.Write([]byte(`{"results":[{"extensions":[{
+				"extensionName":"vscode-yaml",
+				"publisher":{"publisherName":"redhat"},
+				"versions":[{
+					"version":"1.22.2026032808",
+					"properties":[{"key":"Microsoft.VisualStudio.Code.PreRelease","value":"true"}]
+				}]
+			}]}]}`))
+		} else if req.Flags == 0x2|0x10 {
+			// Phase 2 (flags=18): all versions — first is pre-release, second is stable.
+			_, _ = w.Write([]byte(`{"results":[{"extensions":[{
+				"extensionName":"vscode-yaml",
+				"publisher":{"publisherName":"redhat"},
+				"versions":[
+					{"version":"1.22.2026032808","properties":[{"key":"Microsoft.VisualStudio.Code.PreRelease","value":"true"}]},
+					{"version":"1.21.0","properties":[]}
+				]
+			}]}]}`))
+		} else {
+			t.Errorf("unexpected flags: %d", req.Flags)
+			w.Write([]byte(`{"results":[]}`))
+		}
+	}))
+	defer srv.Close()
+
+	client := marketplace.NewVSMarketplaceClientWithBaseURL(srv.Client(), srv.URL)
+	got, err := client.GetLatestVersions(context.Background(), []string{"redhat.vscode-yaml"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if requestCount != 2 {
+		t.Errorf("expected 2 requests (phase1 + phase2), got %d", requestCount)
+	}
+	lv, ok := got["redhat.vscode-yaml"]
+	if !ok || !lv.Found {
+		t.Fatalf("redhat.vscode-yaml: expected Found=true, got %+v", lv)
+	}
+	if lv.Version != "1.21.0" {
+		t.Errorf("expected stable version 1.21.0, got %q", lv.Version)
+	}
+	if lv.LatestPreReleaseVersion != "1.22.2026032808" {
+		t.Errorf("expected LatestPreReleaseVersion=1.22.2026032808, got %q", lv.LatestPreReleaseVersion)
+	}
+	if lv.PreRelease {
+		t.Errorf("expected PreRelease=false (stable exists), got true")
+	}
+}
+
+// TestVSMarketplace_AllPreRelease verifies that when all versions are pre-releases,
+// the client marks PreRelease=true with no stable version.
+func TestVSMarketplace_AllPreRelease(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		// Both phase 1 and phase 2 return only pre-release versions.
+		_, _ = w.Write([]byte(`{"results":[{"extensions":[{
+			"extensionName":"myext",
+			"publisher":{"publisherName":"mypub"},
+			"versions":[
+				{"version":"2.0.0-pre","properties":[{"key":"Microsoft.VisualStudio.Code.PreRelease","value":"true"}]},
+				{"version":"1.0.0-pre","properties":[{"key":"Microsoft.VisualStudio.Code.PreRelease","value":"true"}]}
+			]
+		}]}]}`))
+	}))
+	defer srv.Close()
+
+	client := marketplace.NewVSMarketplaceClientWithBaseURL(srv.Client(), srv.URL)
+	got, err := client.GetLatestVersions(context.Background(), []string{"mypub.myext"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	lv, ok := got["mypub.myext"]
+	if !ok || !lv.Found {
+		t.Fatalf("mypub.myext: expected Found=true, got %+v", lv)
+	}
+	if !lv.PreRelease {
+		t.Errorf("expected PreRelease=true (all versions are pre-release), got false")
+	}
+	if lv.Version != "" {
+		t.Errorf("expected empty stable Version when all are pre-release, got %q", lv.Version)
+	}
+}
+
+// TestVSMarketplace_StableLatest verifies that when the latest version is already stable,
+// no second request is made.
+func TestVSMarketplace_StableLatest(t *testing.T) {
+	requestCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"results":[{"extensions":[{
+			"extensionName":"vscode-eslint",
+			"publisher":{"publisherName":"dbaeumer"},
+			"versions":[{"version":"2.4.4","properties":[]}]
+		}]}]}`))
+	}))
+	defer srv.Close()
+
+	client := marketplace.NewVSMarketplaceClientWithBaseURL(srv.Client(), srv.URL)
+	got, err := client.GetLatestVersions(context.Background(), []string{"dbaeumer.vscode-eslint"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if requestCount != 1 {
+		t.Errorf("expected exactly 1 request for stable extension, got %d", requestCount)
+	}
+	lv, ok := got["dbaeumer.vscode-eslint"]
+	if !ok || !lv.Found {
+		t.Fatalf("dbaeumer.vscode-eslint: expected Found=true, got %+v", lv)
+	}
+	if lv.Version != "2.4.4" {
+		t.Errorf("expected version 2.4.4, got %q", lv.Version)
+	}
+	if lv.PreRelease {
+		t.Errorf("expected PreRelease=false for stable extension")
+	}
+	if lv.LatestPreReleaseVersion != "" {
+		t.Errorf("expected empty LatestPreReleaseVersion for stable extension, got %q", lv.LatestPreReleaseVersion)
 	}
 }
 

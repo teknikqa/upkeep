@@ -19,6 +19,17 @@ type LatestVersion struct {
 	ID      string
 	Version string
 	Found   bool // false if extension was not found in marketplace
+
+	// PreRelease is true when no stable version exists in the marketplace at all
+	// (every published version is a pre-release). When true, compareVersions skips
+	// the extension entirely — there is nothing stable to upgrade to.
+	PreRelease bool
+
+	// LatestPreReleaseVersion is the version string of the most recent pre-release,
+	// populated when the marketplace's latest version is a pre-release but a stable
+	// version also exists. compareVersions uses this to detect when the user has
+	// intentionally installed the pre-release track and should not be flagged as outdated.
+	LatestPreReleaseVersion string
 }
 
 // Client can query a marketplace for latest extension versions.

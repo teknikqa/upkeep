@@ -1,6 +1,7 @@
 package marketplace
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,10 @@ import (
 
 const openVSXDefaultBaseURL = "https://open-vsx.org"
 const openVSXDefaultConcurrency = 5
+
+// openVSXStableSearchLimit is the maximum number of version candidates to check when
+// searching for the latest stable version after detecting a pre-release.
+const openVSXStableSearchLimit = 20
 
 // OpenVSXClient implements Client for the Open VSX Registry API.
 type OpenVSXClient struct {
@@ -41,13 +46,72 @@ func NewOpenVSXClientWithBaseURL(httpClient *http.Client, baseURL string) *OpenV
 
 // openVSXResponse is the relevant portion of the Open VSX per-extension API response.
 type openVSXResponse struct {
-	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
-	Version   string `json:"version"`
-	Error     string `json:"error"` // non-empty on API-level errors
+	Namespace  string `json:"namespace"`
+	Name       string `json:"name"`
+	Version    string `json:"version"`
+	PreRelease bool   `json:"preRelease"` // true when this version is a pre-release
+	Error      string `json:"error"`      // non-empty on API-level errors
 }
 
-// GetLatestVersions queries Open VSX for the latest version of each extension.
+// openVSXVersionsResponse is the response from the Open VSX /versions endpoint.
+// The API returns versions in descending semantic order (highest first), but the
+// "versions" field is a JSON object — Go's map[string]string loses insertion order.
+// We use a custom unmarshaler to preserve the API's guaranteed order.
+type openVSXVersionsResponse struct {
+	Offset    int      `json:"offset"`
+	TotalSize int      `json:"totalSize"`
+	Versions  []string // version strings in API order (descending semver)
+}
+
+// UnmarshalJSON preserves the key insertion order of the "versions" JSON object.
+// The Open VSX API guarantees descending semantic version order (sorted by
+// semver_major desc, semver_minor desc, semver_patch desc in the database),
+// so preserving key order gives us the correct "latest first" sequence.
+func (r *openVSXVersionsResponse) UnmarshalJSON(data []byte) error {
+	// Decode the outer object manually to handle "versions" specially.
+	var raw struct {
+		Offset    int             `json:"offset"`
+		TotalSize int             `json:"totalSize"`
+		Versions  json.RawMessage `json:"versions"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	r.Offset = raw.Offset
+	r.TotalSize = raw.TotalSize
+
+	// Parse the "versions" object preserving key order via json.Decoder.
+	dec := json.NewDecoder(bytes.NewReader(raw.Versions))
+	tok, err := dec.Token() // opening '{'
+	if err != nil {
+		return fmt.Errorf("parsing versions object: %w", err)
+	}
+	if delim, ok := tok.(json.Delim); !ok || delim != '{' {
+		return fmt.Errorf("expected '{' for versions, got %v", tok)
+	}
+
+	for dec.More() {
+		keyTok, err := dec.Token() // version string key
+		if err != nil {
+			return fmt.Errorf("reading version key: %w", err)
+		}
+		key, ok := keyTok.(string)
+		if !ok {
+			return fmt.Errorf("expected string key, got %T", keyTok)
+		}
+		r.Versions = append(r.Versions, key)
+
+		// Skip the URL value — we don't need it.
+		var discard string
+		if err := dec.Decode(&discard); err != nil {
+			return fmt.Errorf("reading version URL for %q: %w", key, err)
+		}
+	}
+
+	return nil
+}
+
+// GetLatestVersions queries Open VSX for the latest stable version of each extension.
 // Extension IDs must be in "publisher.name" format (case-insensitive).
 // Uses concurrent GET requests bounded by the client's concurrency limit.
 func (c *OpenVSXClient) GetLatestVersions(ctx context.Context, extensionIDs []string) (map[string]LatestVersion, error) {
@@ -154,9 +218,106 @@ func (c *OpenVSXClient) queryOne(ctx context.Context, extensionID string) (Lates
 		return LatestVersion{ID: key, Found: false}, nil
 	}
 
+	// If the latest version is stable, return it directly — no extra requests needed.
+	if !apiResp.PreRelease {
+		return LatestVersion{
+			ID:      key,
+			Version: apiResp.Version,
+			Found:   true,
+		}, nil
+	}
+
+	// Latest version is a pre-release. Record it and search for the latest stable version.
+	latestPreRelease := apiResp.Version
+	stableVersion, found := c.findStableVersion(ctx, namespace, name)
+	if !found {
+		// All checked versions are pre-release — signal that no stable exists.
+		return LatestVersion{
+			ID:                      key,
+			Version:                 "",
+			Found:                   true,
+			PreRelease:              true,
+			LatestPreReleaseVersion: latestPreRelease,
+		}, nil
+	}
+
 	return LatestVersion{
-		ID:      key,
-		Version: apiResp.Version,
-		Found:   true,
+		ID:                      key,
+		Version:                 stableVersion,
+		Found:                   true,
+		LatestPreReleaseVersion: latestPreRelease,
 	}, nil
+}
+
+// findStableVersion fetches the /versions listing for an extension and checks candidates
+// (up to openVSXStableSearchLimit) to find the latest stable (non-pre-release) version.
+// Returns ("", false) if no stable version is found within the limit.
+func (c *OpenVSXClient) findStableVersion(ctx context.Context, namespace, name string) (string, bool) {
+	versionsURL := fmt.Sprintf("%s/api/%s/%s/versions", c.baseURL, namespace, name)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, versionsURL, nil)
+	if err != nil {
+		return "", false
+	}
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return "", false
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", false
+	}
+
+	var versionsResp openVSXVersionsResponse
+	if err := json.Unmarshal(data, &versionsResp); err != nil {
+		return "", false
+	}
+
+	// versionsResp.Versions is already in API order (descending semver).
+	// Check candidates up to the limit.
+	candidates := versionsResp.Versions
+	limit := openVSXStableSearchLimit
+	if limit > len(candidates) {
+		limit = len(candidates)
+	}
+
+	for _, ver := range candidates[:limit] {
+		verURL := fmt.Sprintf("%s/api/%s/%s/%s", c.baseURL, namespace, name, ver)
+		verReq, err := http.NewRequestWithContext(ctx, http.MethodGet, verURL, nil)
+		if err != nil {
+			continue
+		}
+		verReq.Header.Set("Accept", "application/json")
+
+		verResp, err := c.httpClient.Do(verReq)
+		if err != nil || verResp.StatusCode != http.StatusOK {
+			if verResp != nil {
+				verResp.Body.Close()
+			}
+			continue
+		}
+
+		verData, err := io.ReadAll(verResp.Body)
+		verResp.Body.Close()
+		if err != nil {
+			continue
+		}
+
+		var detail openVSXResponse
+		if err := json.Unmarshal(verData, &detail); err != nil {
+			continue
+		}
+
+		if !detail.PreRelease && detail.Version != "" {
+			return detail.Version, true
+		}
+	}
+
+	return "", false
 }

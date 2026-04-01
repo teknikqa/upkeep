@@ -188,12 +188,24 @@ func parseExtensionList(output string) []marketplace.Extension {
 
 // compareVersions takes installed extensions and marketplace latest versions,
 // returns OutdatedItems for extensions where local version differs from marketplace.
+// Pre-release handling:
+//   - If lv.PreRelease is true (no stable version exists at all), the extension is skipped.
+//   - If the installed version matches lv.LatestPreReleaseVersion, the user is on the
+//     pre-release track intentionally — skip it too.
 func compareVersions(installed []marketplace.Extension, latest map[string]marketplace.LatestVersion) []OutdatedItem {
 	var outdated []OutdatedItem
 	for _, ext := range installed {
 		lv, ok := latest[ext.ID]
 		if !ok || !lv.Found {
 			continue // not in marketplace (private/local), skip
+		}
+		// No stable version exists — nothing to upgrade to.
+		if lv.PreRelease {
+			continue
+		}
+		// Installed version is the latest pre-release — user is on the pre-release track.
+		if lv.LatestPreReleaseVersion != "" && ext.Version == lv.LatestPreReleaseVersion {
+			continue
 		}
 		if lv.Version != ext.Version {
 			outdated = append(outdated, OutdatedItem{

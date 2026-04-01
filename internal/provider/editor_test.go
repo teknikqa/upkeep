@@ -213,3 +213,92 @@ func TestScanResult_GroupsNil(t *testing.T) {
 		t.Error("expected Groups to be nil for non-grouped provider")
 	}
 }
+
+// TestCompareVersions_SkipsPreReleaseInstalled verifies that when the installed version
+// matches LatestPreReleaseVersion, the extension is NOT reported as outdated.
+func TestCompareVersions_SkipsPreReleaseInstalled(t *testing.T) {
+	installed := []marketplace.Extension{
+		{ID: "redhat.vscode-yaml", Version: "1.22.2026032808"},
+	}
+	latest := map[string]marketplace.LatestVersion{
+		"redhat.vscode-yaml": {
+			ID:                      "redhat.vscode-yaml",
+			Version:                 "1.21.0",
+			Found:                   true,
+			LatestPreReleaseVersion: "1.22.2026032808",
+		},
+	}
+
+	items := provider.CompareVersions(installed, latest)
+	if len(items) != 0 {
+		t.Errorf("expected 0 outdated items (user is on pre-release track), got %d: %+v", len(items), items)
+	}
+}
+
+// TestCompareVersions_SkipsAllPreRelease verifies that when lv.PreRelease=true (no stable
+// version exists), the extension is NOT reported as outdated.
+func TestCompareVersions_SkipsAllPreRelease(t *testing.T) {
+	installed := []marketplace.Extension{
+		{ID: "mypub.myext", Version: "2.0.0-pre"},
+	}
+	latest := map[string]marketplace.LatestVersion{
+		"mypub.myext": {
+			ID:                      "mypub.myext",
+			Version:                 "",
+			Found:                   true,
+			PreRelease:              true,
+			LatestPreReleaseVersion: "2.0.0-pre",
+		},
+	}
+
+	items := provider.CompareVersions(installed, latest)
+	if len(items) != 0 {
+		t.Errorf("expected 0 outdated items (no stable version exists), got %d: %+v", len(items), items)
+	}
+}
+
+// TestCompareVersions_StableOutdated verifies that a stable extension is correctly reported
+// as outdated when a newer stable version exists, even if a pre-release is also present.
+func TestCompareVersions_StableOutdated(t *testing.T) {
+	installed := []marketplace.Extension{
+		{ID: "pub.ext", Version: "1.0.0"},
+	}
+	latest := map[string]marketplace.LatestVersion{
+		"pub.ext": {
+			ID:                      "pub.ext",
+			Version:                 "2.0.0",
+			Found:                   true,
+			LatestPreReleaseVersion: "3.0.0-beta",
+		},
+	}
+
+	items := provider.CompareVersions(installed, latest)
+	if len(items) != 1 {
+		t.Fatalf("expected 1 outdated item, got %d: %+v", len(items), items)
+	}
+	if items[0].LatestVersion != "2.0.0" {
+		t.Errorf("expected LatestVersion=2.0.0 (stable), got %q", items[0].LatestVersion)
+	}
+}
+
+// TestCompareVersions_PreReleaseInstalledButStableExists verifies that when the installed
+// version is a pre-release that matches LatestPreReleaseVersion, it is NOT reported as
+// outdated — even though a lower stable version also exists.
+func TestCompareVersions_PreReleaseInstalledButStableExists(t *testing.T) {
+	installed := []marketplace.Extension{
+		{ID: "redhat.vscode-yaml", Version: "1.22.2026032808"},
+	}
+	latest := map[string]marketplace.LatestVersion{
+		"redhat.vscode-yaml": {
+			ID:                      "redhat.vscode-yaml",
+			Version:                 "1.21.0",
+			Found:                   true,
+			LatestPreReleaseVersion: "1.22.2026032808",
+		},
+	}
+
+	items := provider.CompareVersions(installed, latest)
+	if len(items) != 0 {
+		t.Errorf("expected 0 outdated items (on pre-release track), got %d: %+v", len(items), items)
+	}
+}
