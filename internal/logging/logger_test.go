@@ -117,3 +117,127 @@ func TestLogger_LevelFiltering(t *testing.T) {
 		t.Error("warn message should appear at WARN level")
 	}
 }
+
+// --- ParseLevel ---
+
+func TestParseLevel_Debug(t *testing.T) {
+	if got := logging.ParseLevel("debug"); got != logging.LevelDebug {
+		t.Errorf("ParseLevel(\"debug\") = %v, want LevelDebug", got)
+	}
+}
+
+func TestParseLevel_Info(t *testing.T) {
+	if got := logging.ParseLevel("info"); got != logging.LevelInfo {
+		t.Errorf("ParseLevel(\"info\") = %v, want LevelInfo", got)
+	}
+}
+
+func TestParseLevel_Warn(t *testing.T) {
+	if got := logging.ParseLevel("warn"); got != logging.LevelWarn {
+		t.Errorf("ParseLevel(\"warn\") = %v, want LevelWarn", got)
+	}
+}
+
+func TestParseLevel_Error(t *testing.T) {
+	if got := logging.ParseLevel("error"); got != logging.LevelError {
+		t.Errorf("ParseLevel(\"error\") = %v, want LevelError", got)
+	}
+}
+
+func TestParseLevel_Unknown(t *testing.T) {
+	// Unknown strings should default to LevelInfo.
+	if got := logging.ParseLevel("unknown-level"); got != logging.LevelInfo {
+		t.Errorf("ParseLevel(\"unknown-level\") = %v, want LevelInfo (default)", got)
+	}
+}
+
+// --- Error ---
+
+func TestLogger_Error_WritesToFile(t *testing.T) {
+	dir := t.TempDir()
+	l := logging.New(dir, logging.LevelError)
+	defer l.Close()
+
+	l.Error("something went wrong: %s", "disk full")
+
+	date := time.Now().Format("2006-01-02")
+	path := filepath.Join(dir, date+".log")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading log file: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "ERROR") {
+		t.Errorf("expected 'ERROR' label in log file, got %q", content)
+	}
+	if !strings.Contains(content, "disk full") {
+		t.Errorf("expected error message in log file, got %q", content)
+	}
+}
+
+// --- Debug ---
+
+func TestLogger_Debug_WritesToFileAtDebugLevel(t *testing.T) {
+	dir := t.TempDir()
+	l := logging.New(dir, logging.LevelDebug)
+	defer l.Close()
+
+	l.Debug("debug detail: %d", 42)
+
+	date := time.Now().Format("2006-01-02")
+	path := filepath.Join(dir, date+".log")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading log file: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "DEBUG") {
+		t.Errorf("expected 'DEBUG' label in log file, got %q", content)
+	}
+	if !strings.Contains(content, "debug detail: 42") {
+		t.Errorf("expected debug message in log file, got %q", content)
+	}
+}
+
+// --- Writer ---
+
+func TestLogger_Writer_ReturnsWritableWriter(t *testing.T) {
+	dir := t.TempDir()
+	l := logging.New(dir, logging.LevelInfo)
+	defer l.Close()
+
+	w := l.Writer()
+	if w == nil {
+		t.Fatal("expected non-nil Writer()")
+	}
+	// Write directly and verify it lands in the log file.
+	if _, err := w.Write([]byte("raw writer line\n")); err != nil {
+		t.Fatalf("writing to Logger.Writer(): %v", err)
+	}
+
+	date := time.Now().Format("2006-01-02")
+	path := filepath.Join(dir, date+".log")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading log file: %v", err)
+	}
+	if !strings.Contains(string(data), "raw writer line") {
+		t.Errorf("expected log file to contain 'raw writer line', got %q", string(data))
+	}
+}
+
+// --- Close ---
+
+func TestLogger_Close_Idempotent(t *testing.T) {
+	dir := t.TempDir()
+	l := logging.New(dir, logging.LevelInfo)
+	l.Info("before close")
+
+	if err := l.Close(); err != nil {
+		t.Fatalf("first Close: %v", err)
+	}
+	// Second close should be a no-op, not panic or error.
+	if err := l.Close(); err != nil {
+		t.Fatalf("second Close: %v", err)
+	}
+}

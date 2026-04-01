@@ -2,6 +2,8 @@ package ui
 
 import (
 	"testing"
+
+	"github.com/teknikqa/upkeep/internal/config"
 )
 
 func TestFormatMenuLabel_Bool(t *testing.T) {
@@ -96,5 +98,100 @@ func TestMapKeys(t *testing.T) {
 	keys := mapKeys(m)
 	if len(keys) != 2 {
 		t.Errorf("expected 2 keys, got %d", len(keys))
+	}
+}
+
+// --- copyStringSlice ---
+
+func TestCopyStringSlice_Nil(t *testing.T) {
+	if got := copyStringSlice(nil); got != nil {
+		t.Errorf("expected nil, got %v", got)
+	}
+}
+
+func TestCopyStringSlice_Empty(t *testing.T) {
+	got := copyStringSlice([]string{})
+	if got == nil || len(got) != 0 {
+		t.Errorf("expected empty non-nil slice, got %v", got)
+	}
+}
+
+func TestCopyStringSlice_Independence(t *testing.T) {
+	orig := []string{"a", "b", "c"}
+	cp := copyStringSlice(orig)
+	cp[0] = "MODIFIED"
+	if orig[0] != "a" {
+		t.Errorf("original slice was mutated: %v", orig)
+	}
+}
+
+// --- copyStringBoolMap ---
+
+func TestCopyStringBoolMap_Nil(t *testing.T) {
+	if got := copyStringBoolMap(nil); got != nil {
+		t.Errorf("expected nil, got %v", got)
+	}
+}
+
+func TestCopyStringBoolMap_Independence(t *testing.T) {
+	orig := map[string]bool{"x": true, "y": false}
+	cp := copyStringBoolMap(orig)
+	cp["x"] = false
+	if !orig["x"] {
+		t.Errorf("original map was mutated")
+	}
+}
+
+// --- copyConfig ---
+
+func TestCopyConfig_DeepCopy(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Providers.Brew.Skip = []string{"formula1", "formula2"}
+	cfg.Providers.BrewCask.AuthOverrides = map[string]bool{"app1": true}
+
+	cp := copyConfig(cfg)
+
+	// Mutate the copy.
+	cp.Providers.Brew.Skip[0] = "MODIFIED"
+	cp.Providers.BrewCask.AuthOverrides["app1"] = false
+
+	// Original must be unchanged.
+	if cfg.Providers.Brew.Skip[0] != "formula1" {
+		t.Errorf("Brew.Skip[0] was mutated: %q", cfg.Providers.Brew.Skip[0])
+	}
+	if !cfg.Providers.BrewCask.AuthOverrides["app1"] {
+		t.Errorf("BrewCask.AuthOverrides[\"app1\"] was mutated")
+	}
+}
+
+// --- statusEmoji ---
+
+func TestStatusEmoji_Success(t *testing.T) {
+	if got := statusEmoji("success"); got != "✅" {
+		t.Errorf("expected ✅, got %q", got)
+	}
+}
+
+func TestStatusEmoji_Partial(t *testing.T) {
+	if got := statusEmoji("partial"); got != "📬" {
+		t.Errorf("expected 📬, got %q", got)
+	}
+}
+
+func TestStatusEmoji_Failed(t *testing.T) {
+	if got := statusEmoji("failed"); got != "❌" {
+		t.Errorf("expected ❌, got %q", got)
+	}
+}
+
+func TestStatusEmoji_Skipped(t *testing.T) {
+	if got := statusEmoji("skipped"); got != "⏭" {
+		t.Errorf("expected ⏭, got %q", got)
+	}
+}
+
+func TestStatusEmoji_Unknown(t *testing.T) {
+	if got := statusEmoji("anything-else"); got != "❓" {
+		t.Errorf("expected ❓, got %q", got)
 	}
 }

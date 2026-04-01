@@ -56,3 +56,34 @@ func TestBuildOsascriptScript(t *testing.T) {
 		t.Errorf("expected message 'All done' in script, got: %q", script)
 	}
 }
+
+// --- New constructor ---
+
+func TestNew_SetsConfig(t *testing.T) {
+	cfg := config.NotificationsConfig{Enabled: true, Tool: "osascript"}
+	n := notify.New(cfg)
+	if n == nil {
+		t.Fatal("expected non-nil Notifier from New()")
+	}
+	// Verify the config is honoured: disabled path returns nil.
+	n2 := notify.New(config.NotificationsConfig{Enabled: false})
+	if err := n2.Notify("T", "M", ""); err != nil {
+		t.Errorf("expected nil from disabled notifier, got: %v", err)
+	}
+}
+
+// --- Notify dispatch: disabled overrides explicit tool ---
+
+func TestNotify_ExplicitTerminalNotifier_DisabledReturnsNil(t *testing.T) {
+	n := notify.New(config.NotificationsConfig{Enabled: false, Tool: "terminal-notifier"})
+	if err := n.Notify("T", "M", "https://example.com"); err != nil {
+		t.Errorf("expected nil when disabled with terminal-notifier tool, got: %v", err)
+	}
+}
+
+func TestNotify_ExplicitOsascript_DisabledReturnsNil(t *testing.T) {
+	n := notify.New(config.NotificationsConfig{Enabled: false, Tool: "osascript"})
+	if err := n.Notify("T", "M", ""); err != nil {
+		t.Errorf("expected nil when disabled with osascript tool, got: %v", err)
+	}
+}

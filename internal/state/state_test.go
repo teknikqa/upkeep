@@ -156,3 +156,60 @@ func TestSave_CreatesDirectory(t *testing.T) {
 		t.Errorf("expected state file to exist at %q: %v", path, err)
 	}
 }
+
+// --- expandHome / DefaultStatePath ---
+
+func TestExpandHome_WithTilde(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("cannot determine home dir")
+	}
+	got := state.ExportExpandHome("~/foo/bar")
+	want := filepath.Join(home, "foo/bar")
+	if got != want {
+		t.Errorf("expandHome(\"~/foo/bar\") = %q, want %q", got, want)
+	}
+}
+
+func TestExpandHome_WithoutTilde(t *testing.T) {
+	got := state.ExportExpandHome("/absolute/path")
+	if got != "/absolute/path" {
+		t.Errorf("expandHome(\"/absolute/path\") = %q, want unchanged", got)
+	}
+}
+
+func TestExpandHome_EmptyString(t *testing.T) {
+	got := state.ExportExpandHome("")
+	if got != "" {
+		t.Errorf("expandHome(\"\") = %q, want \"\"", got)
+	}
+}
+
+func TestExpandHome_TildeOnly(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("cannot determine home dir")
+	}
+	got := state.ExportExpandHome("~")
+	// filepath.Join(home, "") = home
+	if got != home {
+		t.Errorf("expandHome(\"~\") = %q, want %q", got, home)
+	}
+}
+
+func TestDefaultStatePath_ContainsHome(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("cannot determine home dir")
+	}
+	got := state.DefaultStatePath()
+	if !filepath.IsAbs(got) {
+		t.Errorf("DefaultStatePath() = %q should be absolute", got)
+	}
+	if len(got) < len(home) || got[:len(home)] != home {
+		t.Errorf("DefaultStatePath() = %q should start with home dir %q", got, home)
+	}
+	if filepath.Base(got) != "last-run.json" {
+		t.Errorf("DefaultStatePath() = %q should end with last-run.json", got)
+	}
+}

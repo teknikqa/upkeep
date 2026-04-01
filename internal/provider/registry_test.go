@@ -101,3 +101,73 @@ func TestRegistry_DuplicateRegisterPanics(t *testing.T) {
 	}()
 	r.Register(&mockProvider{name: "brew"})
 }
+
+// --- Registry.GetAll ---
+
+func TestRegistry_GetAll(t *testing.T) {
+	r := provider.ExportNewRegistry()
+	r.Register(&mockProvider{name: "brew"})
+	r.Register(&mockProvider{name: "npm"})
+	r.Register(&mockProvider{name: "pip"})
+
+	all := r.GetAll()
+	if len(all) != 3 {
+		t.Errorf("expected 3 providers, got %d", len(all))
+	}
+}
+
+// --- Global registry functions ---
+
+func TestGlobal_List_ReturnsRegisteredProviders(t *testing.T) {
+	names := provider.List()
+	if len(names) == 0 {
+		t.Fatal("expected at least one registered provider")
+	}
+	// List should be sorted.
+	for i := 1; i < len(names); i++ {
+		if names[i] < names[i-1] {
+			t.Errorf("List() not sorted: %q < %q at index %d", names[i], names[i-1], i)
+		}
+	}
+}
+
+func TestGlobal_Get_KnownProvider(t *testing.T) {
+	// "brew" is registered via init().
+	p, err := provider.Get("brew")
+	if err != nil {
+		t.Fatalf("Get(\"brew\"): %v", err)
+	}
+	if p.Name() != "brew" {
+		t.Errorf("expected provider name 'brew', got %q", p.Name())
+	}
+}
+
+func TestGlobal_Get_UnknownProvider(t *testing.T) {
+	_, err := provider.Get("nonexistent-provider-xyz")
+	if err == nil {
+		t.Fatal("expected error for unknown provider, got nil")
+	}
+}
+
+func TestGlobal_GetAll_LengthMatchesList(t *testing.T) {
+	all := provider.GetAll()
+	names := provider.List()
+	if len(all) != len(names) {
+		t.Errorf("GetAll() len=%d, List() len=%d — expected equal", len(all), len(names))
+	}
+}
+
+func TestGlobal_GetByNames_Subset(t *testing.T) {
+	names := provider.List()
+	if len(names) < 2 {
+		t.Skip("need at least 2 providers for subset test")
+	}
+	subset := names[:2]
+	ps, err := provider.GetByNames(subset)
+	if err != nil {
+		t.Fatalf("GetByNames: %v", err)
+	}
+	if len(ps) != 2 {
+		t.Errorf("expected 2 providers, got %d", len(ps))
+	}
+}
