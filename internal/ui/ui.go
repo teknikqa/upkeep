@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -14,6 +15,11 @@ import (
 
 	"github.com/teknikqa/upkeep/internal/provider"
 )
+
+// trailingPadRe matches trailing whitespace that may be wrapped inside ANSI
+// escape sequences (e.g. "  \033[0m") so we can strip padding pterm adds to
+// the last column.
+var trailingPadRe = regexp.MustCompile(`\s+(\x1b\[[0-9;]*m\s*)*$`)
 
 // IsTTY returns true if stdout is a terminal.
 func IsTTY() bool {
@@ -82,7 +88,13 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) {
 				data = append(data, []string{r.DisplayName, status, outdated, formatPackageList(r.Packages)})
 			}
 		}
-		_ = pterm.DefaultTable.WithHasHeader().WithData(data).Render()
+		rendered, _ := pterm.DefaultTable.WithHasHeader().WithData(data).Srender()
+		// pterm pads the last column to the max width which causes line
+		// wrapping in narrow terminals.  Strip trailing whitespace per line,
+		// including whitespace wrapped inside ANSI escape sequences.
+		for _, line := range strings.Split(strings.TrimRight(rendered, "\n"), "\n") {
+			fmt.Println(trailingPadRe.ReplaceAllString(line, ""))
+		}
 	} else {
 		fmt.Printf("%-25s %-15s %-8s %s\n", "Provider", "Status", "Outdated", "Packages")
 		fmt.Printf("%-25s %-15s %-8s %s\n", "--------", "------", "--------", "--------")
@@ -131,7 +143,10 @@ func RenderFinalReport(rows []UpdateSummaryRow, totalDuration time.Duration) {
 				r.Duration.Round(time.Millisecond).String(),
 			})
 		}
-		_ = pterm.DefaultTable.WithHasHeader().WithData(data).Render()
+		rendered, _ := pterm.DefaultTable.WithHasHeader().WithData(data).Srender()
+		for _, line := range strings.Split(strings.TrimRight(rendered, "\n"), "\n") {
+			fmt.Println(trailingPadRe.ReplaceAllString(line, ""))
+		}
 	} else {
 		fmt.Printf("%-20s %-12s %-8s %-8s %-8s %-8s %s\n",
 			"Provider", "Status", "Updated", "Deferred", "Skipped", "Failed", "Duration")
