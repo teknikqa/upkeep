@@ -304,14 +304,6 @@ func ScanSummaryRowsFromResults(results map[string]provider.ScanResult, displayN
 	return rows
 }
 
-// formatPackageList returns package names joined by ", ", or "-" if empty.
-func formatPackageList(pkgs []string) string {
-	if len(pkgs) == 0 {
-		return "-"
-	}
-	return strings.Join(pkgs, ", ")
-}
-
 // GroupSubRow represents one sub-group line in a grouped scan summary.
 type GroupSubRow struct {
 	Label    string   // tree-prefixed group label (e.g. "  ├ code", "  └ cursor")
