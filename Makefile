@@ -81,6 +81,22 @@ release-dry-run:
 .PHONY: ci
 ci: fmt lint test build
 
+# Run all quality checks: fmt, lint, test, build
+# Equivalent to ci — use this as a pre-commit / pre-PR sanity check.
+.PHONY: check
+check: fmt lint test build
+	@echo "All checks passed."
+
+# Run govulncheck for known vulnerabilities in dependencies.
+# Install with: go install golang.org/x/vuln/cmd/govulncheck@latest
+.PHONY: govulncheck
+govulncheck:
+	@if command -v govulncheck >/dev/null 2>&1; then \
+		govulncheck ./...; \
+	else \
+		echo "govulncheck not installed — skipping (run: go install golang.org/x/vuln/cmd/govulncheck@latest)"; \
+	fi
+
 # Dry-run: scan only, no updates
 .PHONY: dry-run
 dry-run: build
