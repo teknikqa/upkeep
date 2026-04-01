@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	upkeeperrors "github.com/teknikqa/upkeep/internal/errors"
 	"gopkg.in/yaml.v3"
 )
 
@@ -263,35 +264,47 @@ func expandHomePaths(cfg *Config) {
 // Validate checks that config values are within acceptable ranges.
 func Validate(cfg *Config) error {
 	if cfg.Parallelism < 1 {
-		return fmt.Errorf("parallelism must be >= 1, got %d", cfg.Parallelism)
+		return &upkeeperrors.ConfigError{Field: "parallelism", Err: fmt.Errorf("must be >= 1, got %d", cfg.Parallelism)}
 	}
 	if cfg.Parallelism > 32 {
-		return fmt.Errorf("parallelism must be <= 32, got %d", cfg.Parallelism)
+		return &upkeeperrors.ConfigError{Field: "parallelism", Err: fmt.Errorf("must be <= 32, got %d", cfg.Parallelism)}
 	}
 	switch cfg.Providers.BrewCask.AuthStrategy {
 	case "defer", "force-interactive", "skip":
 		// valid
 	default:
-		return fmt.Errorf("brew-cask auth_strategy must be one of: defer, force-interactive, skip; got %q", cfg.Providers.BrewCask.AuthStrategy)
+		return &upkeeperrors.ConfigError{
+			Field: "providers.brew-cask.auth_strategy",
+			Err:   fmt.Errorf("must be one of: defer, force-interactive, skip; got %q", cfg.Providers.BrewCask.AuthStrategy),
+		}
 	}
 	switch cfg.Logging.Level {
 	case "debug", "info", "warn", "error":
 		// valid
 	default:
-		return fmt.Errorf("logging level must be one of: debug, info, warn, error; got %q", cfg.Logging.Level)
+		return &upkeeperrors.ConfigError{
+			Field: "logging.level",
+			Err:   fmt.Errorf("must be one of: debug, info, warn, error; got %q", cfg.Logging.Level),
+		}
 	}
 	switch cfg.Notifications.Tool {
 	case "terminal-notifier", "osascript":
 		// valid
 	default:
-		return fmt.Errorf("notification tool must be one of: terminal-notifier, osascript; got %q", cfg.Notifications.Tool)
+		return &upkeeperrors.ConfigError{
+			Field: "notifications.tool",
+			Err:   fmt.Errorf("must be one of: terminal-notifier, osascript; got %q", cfg.Notifications.Tool),
+		}
 	}
 	for editor, mp := range cfg.Providers.Editor.Marketplace {
 		switch mp {
 		case "vsmarketplace", "openvsx":
 			// valid
 		default:
-			return fmt.Errorf("editor marketplace for %q must be \"vsmarketplace\" or \"openvsx\"; got %q", editor, mp)
+			return &upkeeperrors.ConfigError{
+				Field: fmt.Sprintf("providers.editor.marketplace.%s", editor),
+				Err:   fmt.Errorf("must be \"vsmarketplace\" or \"openvsx\"; got %q", mp),
+			}
 		}
 	}
 	return nil

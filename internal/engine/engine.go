@@ -171,6 +171,10 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 			s := result.Error.Error()
 			errStr = &s
 		}
+		// Determine provider status using a priority hierarchy:
+		//   1. "failed"  — error with no successful updates (worst outcome)
+		//   2. "partial" — some packages failed OR some were deferred with no updates
+		//   3. "success" — everything updated (or nothing to update)
 		status := "success"
 		switch {
 		case result.Error != nil && len(result.Updated) == 0:
@@ -269,7 +273,9 @@ func filterProvidersByName(providers []provider.Provider, names []string) []prov
 	return filtered
 }
 
-// buildSkipLists converts config skip lists into a map[providerName]map[pkg]bool.
+// buildSkipLists converts per-provider skip lists from config into a nested
+// map[providerName]map[packageName]bool for O(1) lookup during scan.
+// Only providers that have at least one skip entry are included.
 func buildSkipLists(cfg *config.Config) map[string]map[string]bool {
 	result := make(map[string]map[string]bool)
 	addSkips := func(name string, list []string) {

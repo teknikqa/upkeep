@@ -5,6 +5,7 @@ import (
 	"context"
 	"sync"
 
+	upkeeperrors "github.com/teknikqa/upkeep/internal/errors"
 	"github.com/teknikqa/upkeep/internal/provider"
 )
 
@@ -53,6 +54,15 @@ func Scan(ctx context.Context, providers []provider.Provider, opts ScanOptions) 
 			}
 
 			result := p.Scan(ctx)
+
+			// Wrap any scan error in a ProviderError for structured handling.
+			if result.Error != nil {
+				result.Error = &upkeeperrors.ProviderError{
+					Provider: p.Name(),
+					Phase:    "scan",
+					Err:      result.Error,
+				}
+			}
 
 			// Apply skip-list filtering.
 			if skipSet := opts.SkipLists[p.Name()]; len(skipSet) > 0 {

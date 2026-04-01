@@ -29,6 +29,8 @@ func SetVerboseOutput(w io.Writer) {
 }
 
 // getVerboseWriter returns the current verbose writer (nil if unset).
+// Uses a read lock (verboseMu) so concurrent RunCommand* calls can read the
+// writer without blocking each other; only SetVerboseOutput holds a write lock.
 func getVerboseWriter() io.Writer {
 	verboseMu.RLock()
 	defer verboseMu.RUnlock()

@@ -18,22 +18,26 @@ type Registry struct {
 }
 
 // Register adds a provider to the global registry.
+// Providers call this from their init() function to self-register at startup.
 // Panics if a provider with the same name is already registered.
 func Register(p Provider) {
 	globalRegistry.Register(p)
 }
 
 // Get returns the provider with the given name from the global registry.
+// Returns an error if no provider with that name is registered.
 func Get(name string) (Provider, error) {
 	return globalRegistry.Get(name)
 }
 
 // List returns a sorted list of all registered provider names.
+// Provider names are the canonical machine-readable identifiers (e.g., "brew", "npm").
 func List() []string {
 	return globalRegistry.List()
 }
 
 // GetAll returns all registered providers (order not guaranteed).
+// Providers self-register via init(), so the set is populated at package import time.
 func GetAll() []Provider {
 	return globalRegistry.GetAll()
 }

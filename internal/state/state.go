@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	upkeeperrors "github.com/teknikqa/upkeep/internal/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -91,7 +92,7 @@ func Load(path string) (*State, error) {
 	defer unlockFile(f) //nolint:errcheck
 
 	if err := json.NewDecoder(f).Decode(s); err != nil {
-		return nil, fmt.Errorf("parsing state file %q: %w", path, err)
+		return nil, &upkeeperrors.StateCorruptedError{Path: path, Err: err}
 	}
 	s.path = path
 	return s, nil
@@ -173,6 +174,10 @@ func (s *State) SetProviderResult(name string, ps ProviderStatus) {
 
 // lockFile acquires an advisory flock on f.
 // exclusive=true acquires an exclusive (write) lock; false acquires a shared (read) lock.
+// The flock is advisory — it only blocks other processes (or goroutines) that also call
+// lockFile. Save uses a temp+rename pattern so readers never see a partial write: the
+// exclusive lock on the temp file prevents concurrent writers from racing, and os.Rename
+// is atomic on POSIX filesystems.
 func lockFile(f *os.File, exclusive bool) error {
 	how := unix.LOCK_SH
 	if exclusive {

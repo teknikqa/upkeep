@@ -1,9 +1,14 @@
+// Package engine orchestrates the scan→confirm→execute→report pipeline.
+// The executor implements a dependency-graph based parallel execution model:
+// providers whose DependsOn() dependencies are satisfied are started immediately,
+// and each completing provider recursively wakes any newly-ready dependents.
 package engine
 
 import (
 	"context"
 	"sync"
 
+	upkeeperrors "github.com/teknikqa/upkeep/internal/errors"
 	"github.com/teknikqa/upkeep/internal/provider"
 )
 
@@ -48,14 +53,34 @@ func Execute(ctx context.Context, providers []provider.Provider, scanResults map
 	}
 
 	// startProvider launches a provider in a goroutine when all its dependencies
-	// have completed.
+	// have completed. It respects context cancellation both while waiting for a
+	// semaphore slot and immediately before calling Update, so in-flight goroutines
+	// drain quickly when the user cancels.
 	var startProvider func(p provider.Provider)
 	startProvider = func(p provider.Provider) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			sem <- struct{}{}
+
+			// Wait for a semaphore slot, but bail out if context is cancelled.
+			select {
+			case <-ctx.Done():
+				mu.Lock()
+				results[p.Name()] = provider.UpdateResult{Error: ctx.Err()}
+				mu.Unlock()
+				return
+			case sem <- struct{}{}:
+			}
 			defer func() { <-sem }()
+
+			// Check context again after acquiring semaphore (it may have been
+			// cancelled while we were waiting).
+			if ctx.Err() != nil {
+				mu.Lock()
+				results[p.Name()] = provider.UpdateResult{Error: ctx.Err()}
+				mu.Unlock()
+				return
+			}
 
 			// Notify that this provider is starting.
 			if opts.OnStart != nil {
@@ -65,6 +90,15 @@ func Execute(ctx context.Context, providers []provider.Provider, scanResults map
 			// Get the items to update from the scan results.
 			scanResult := scanResults[p.Name()]
 			result := p.Update(ctx, scanResult.Outdated)
+
+			// Wrap any update error in a ProviderError for structured handling.
+			if result.Error != nil {
+				result.Error = &upkeeperrors.ProviderError{
+					Provider: p.Name(),
+					Phase:    "update",
+					Err:      result.Error,
+				}
+			}
 
 			mu.Lock()
 			results[p.Name()] = result

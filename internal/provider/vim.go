@@ -119,7 +119,7 @@ func (p *VimProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 	if p.cfg.PathogenDir != "" {
 		if _, err := os.Stat(p.cfg.PathogenDir); err == nil {
 			dest := filepath.Join(p.cfg.PathogenDir, "pathogen.vim")
-			if err := downloadFile(pathogenURL, dest); err != nil {
+			if err := downloadFile(ctx, pathogenURL, dest); err != nil {
 				p.logf("downloading pathogen: %v", err)
 				failed = append(failed, "pathogen.vim")
 			} else {
@@ -159,9 +159,14 @@ func (p *VimProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 	}
 }
 
-// downloadFile downloads url to dest, creating parent directories as needed.
-func downloadFile(url, dest string) error {
-	resp, err := http.Get(url) //nolint:gosec
+// downloadFile downloads url to dest using the provided context, creating
+// parent directories as needed.
+func downloadFile(ctx context.Context, url, dest string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("creating request for %s: %w", url, err)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("downloading %s: %w", url, err)
 	}
