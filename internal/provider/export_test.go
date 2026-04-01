@@ -65,9 +65,9 @@ func CommandExistsExport(name string) bool {
 	return CommandExists(name)
 }
 
-// ParseComposerOutdated exposes parseComposerOutdated for testing.
-func ParseComposerOutdated(jsonStr string) ([]OutdatedItem, error) {
-	return parseComposerOutdated(jsonStr)
+// ParseComposerDryRun exposes parseComposerDryRun for testing.
+func ParseComposerDryRun(output string) []OutdatedItem {
+	return parseComposerDryRun(output)
 }
 
 // ParsePipOutdated exposes parsePipOutdated for testing.
