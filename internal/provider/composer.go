@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/teknikqa/upkeep/internal/config"
@@ -92,9 +93,18 @@ func (p *ComposerProvider) Update(ctx context.Context, items []OutdatedItem) Upd
 }
 
 // parseComposerOutdated parses the JSON output of `composer global outdated --format=json`.
+// Composer returns {"installed": [...]} when packages exist, but returns a bare
+// "[]" when no global packages are installed. We handle both forms.
 func parseComposerOutdated(jsonStr string) ([]OutdatedItem, error) {
+	trimmed := strings.TrimSpace(jsonStr)
+
+	// Composer outputs a bare "[]" when no global packages are installed.
+	if trimmed == "[]" {
+		return nil, nil
+	}
+
 	var output composerOutdatedOutput
-	if err := json.Unmarshal([]byte(jsonStr), &output); err != nil {
+	if err := json.Unmarshal([]byte(trimmed), &output); err != nil {
 		return nil, err
 	}
 

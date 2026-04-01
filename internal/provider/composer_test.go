@@ -62,6 +62,28 @@ func TestParseComposerOutdated(t *testing.T) {
 	}
 }
 
+func TestParseComposerOutdated_EmptyArray(t *testing.T) {
+	// Composer returns "[]" when no global packages are installed.
+	items, err := provider.ParseComposerOutdated("[]")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("expected 0 items, got %d", len(items))
+	}
+}
+
+func TestParseComposerOutdated_EmptyArrayWithNewline(t *testing.T) {
+	// Composer may include a trailing newline.
+	items, err := provider.ParseComposerOutdated("[]\n")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("expected 0 items, got %d", len(items))
+	}
+}
+
 func TestComposerProvider_Registered(t *testing.T) {
 	p, err := provider.GetByName("composer")
 	if err != nil {
