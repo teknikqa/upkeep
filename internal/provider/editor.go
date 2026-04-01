@@ -37,6 +37,7 @@ func (p *EditorProvider) Scan(ctx context.Context) ScanResult {
 
 	found := false
 	var allOutdated []OutdatedItem
+	groups := make(map[string][]string)
 
 	// Create marketplace clients (reused across editors with the same marketplace).
 	httpClient := marketplace.DefaultHTTPClient()
@@ -89,7 +90,15 @@ func (p *EditorProvider) Scan(ctx context.Context) ScanResult {
 		}
 
 		// Compare installed vs latest and accumulate outdated items.
-		allOutdated = append(allOutdated, compareVersions(installed, latest)...)
+		editorOutdated := compareVersions(installed, latest)
+		allOutdated = append(allOutdated, editorOutdated...)
+		if len(editorOutdated) > 0 {
+			names := make([]string, len(editorOutdated))
+			for i, item := range editorOutdated {
+				names[i] = item.Name
+			}
+			groups[editor] = names
+		}
 	}
 
 	if !found {
@@ -102,6 +111,7 @@ func (p *EditorProvider) Scan(ctx context.Context) ScanResult {
 		Available:    true,
 		Outdated:     allOutdated,
 		AlwaysUpdate: true,
+		Groups:       groups,
 	}
 }
 

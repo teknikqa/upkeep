@@ -20,11 +20,12 @@ type OutdatedItem struct {
 
 // ScanResult is returned by Provider.Scan().
 type ScanResult struct {
-	Available    bool           // is the tool installed on this system?
-	Outdated     []OutdatedItem // packages with updates available
-	AlwaysUpdate bool           // run Update even when Outdated is empty (e.g. editor)
-	Error        error          // non-fatal scan error
-	Message      string         // human-readable status message
+	Available    bool                // is the tool installed on this system?
+	Outdated     []OutdatedItem      // packages with updates available
+	AlwaysUpdate bool                // run Update even when Outdated is empty (e.g. editor)
+	Error        error               // non-fatal scan error
+	Message      string              // human-readable status message
+	Groups       map[string][]string // optional: group label → package names for sub-grouped display
 }
 
 // UpdateResult is returned by Provider.Update().

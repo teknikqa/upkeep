@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -24,7 +25,8 @@ type ScanSummaryRow struct {
 	ProviderName  string
 	DisplayName   string
 	OutdatedCount int
-	Packages      []string // first few package names
+	Packages      []string            // first few package names
+	PackageGroups map[string][]string // optional: group label → package names
 	Available     bool
 	Error         error
 }
@@ -43,6 +45,8 @@ type UpdateSummaryRow struct {
 }
 
 // RenderScanSummaryTable renders a pre-update scan summary table to stdout.
+// When a row has PackageGroups, it renders a parent row (total count, no packages)
+// followed by indented sub-rows per group (group count + packages).
 func RenderScanSummaryTable(rows []ScanSummaryRow) {
 	if len(rows) == 0 {
 		fmt.Println("No providers available or nothing to update.")
@@ -60,17 +64,28 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) {
 			} else if r.Error != nil {
 				status = "❌ scan error"
 			}
-			pkgList := formatPackageList(r.Packages)
 			outdated := fmt.Sprintf("%d", r.OutdatedCount)
 			if !r.Available {
 				outdated = "-"
 			}
-			data = append(data, []string{r.DisplayName, status, outdated, pkgList})
+
+			if len(r.PackageGroups) > 0 {
+				// Parent row: total count, no packages.
+				data = append(data, []string{r.DisplayName, status, outdated, ""})
+				// Sub-rows per group.
+				for _, sub := range GroupSubRows(r.PackageGroups) {
+					data = append(data, []string{
+						sub.Label, status, fmt.Sprintf("%d", sub.Count), sub.Packages,
+					})
+				}
+			} else {
+				data = append(data, []string{r.DisplayName, status, outdated, formatPackageList(r.Packages)})
+			}
 		}
 		_ = pterm.DefaultTable.WithHasHeader().WithData(data).Render()
 	} else {
-		fmt.Printf("%-20s %-15s %-8s %s\n", "Provider", "Status", "Outdated", "Packages")
-		fmt.Printf("%-20s %-15s %-8s %s\n", "--------", "------", "--------", "--------")
+		fmt.Printf("%-25s %-15s %-8s %s\n", "Provider", "Status", "Outdated", "Packages")
+		fmt.Printf("%-25s %-15s %-8s %s\n", "--------", "------", "--------", "--------")
 		for _, r := range rows {
 			status := "available"
 			if !r.Available {
@@ -78,12 +93,21 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) {
 			} else if r.Error != nil {
 				status = "scan error"
 			}
-			pkgList := formatPackageList(r.Packages)
 			outdated := fmt.Sprintf("%d", r.OutdatedCount)
 			if !r.Available {
 				outdated = "-"
 			}
-			fmt.Printf("%-20s %-15s %-8s %s\n", r.DisplayName, status, outdated, pkgList)
+
+			if len(r.PackageGroups) > 0 {
+				// Parent row: total count, no packages.
+				fmt.Printf("%-25s %-15s %-8s\n", r.DisplayName, status, outdated)
+				// Sub-rows per group.
+				for _, sub := range GroupSubRows(r.PackageGroups) {
+					fmt.Printf("%25s %-15s %-8d %s\n", sub.Label, status, sub.Count, sub.Packages)
+				}
+			} else {
+				fmt.Printf("%-25s %-15s %-8s %s\n", r.DisplayName, status, outdated, formatPackageList(r.Packages))
+			}
 		}
 	}
 }
@@ -190,6 +214,7 @@ func ScanSummaryRowsFromResults(results map[string]provider.ScanResult, displayN
 			DisplayName:   dn,
 			OutdatedCount: len(r.Outdated),
 			Packages:      pkgs,
+			PackageGroups: r.Groups,
 			Available:     r.Available,
 			Error:         r.Error,
 		})
@@ -203,6 +228,76 @@ func formatPackageList(pkgs []string) string {
 		return "-"
 	}
 	return strings.Join(pkgs, ", ")
+}
+
+// GroupSubRow represents one sub-group line in a grouped scan summary.
+type GroupSubRow struct {
+	Label    string // tree-prefixed group label (e.g. "  ├ code", "  └ cursor")
+	Count    int    // number of packages in this group
+	Packages string // comma-separated package names
+}
+
+// GroupSubRows expands a Groups map into sorted sub-rows for table rendering.
+// Each group becomes a row with a tree-style prefix (├ for intermediate, └ for last).
+func GroupSubRows(groups map[string][]string) []GroupSubRow {
+	if len(groups) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(groups))
+	for k := range groups {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Filter out empty groups first so we know which is last.
+	var nonEmpty []string
+	for _, k := range keys {
+		if len(groups[k]) > 0 {
+			nonEmpty = append(nonEmpty, k)
+		}
+	}
+
+	rows := make([]GroupSubRow, 0, len(nonEmpty))
+	for i, k := range nonEmpty {
+		prefix := "  ├ "
+		if i == len(nonEmpty)-1 {
+			prefix = "  └ "
+		}
+		rows = append(rows, GroupSubRow{
+			Label:    prefix + k,
+			Count:    len(groups[k]),
+			Packages: strings.Join(groups[k], ", "),
+		})
+	}
+	return rows
+}
+
+// FormatGroupedPackageList renders sub-grouped packages as "group1: pkg1, pkg2; group2: pkg3".
+// Groups with no packages are omitted. Group labels are sorted for deterministic output.
+func FormatGroupedPackageList(groups map[string][]string) string {
+	if len(groups) == 0 {
+		return "-"
+	}
+	// Sort group keys for deterministic output.
+	keys := make([]string, 0, len(groups))
+	for k := range groups {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var parts []string
+	for _, k := range keys {
+		pkgs := groups[k]
+		if len(pkgs) == 0 {
+			continue
+		}
+		parts = append(parts, k+": "+strings.Join(pkgs, ", "))
+	}
+	if len(parts) == 0 {
+		return "-"
+	}
+	return strings.Join(parts, "; ")
 }
 
 func statusEmoji(status string) string {

@@ -168,3 +168,48 @@ func TestCompareVersions_AllUpToDate(t *testing.T) {
 		t.Errorf("expected 0 outdated, got %v", items)
 	}
 }
+
+func TestScanResult_GroupsConsistency(t *testing.T) {
+	result := provider.ScanResult{
+		Available: true,
+		Outdated: []provider.OutdatedItem{
+			{Name: "ext1"}, {Name: "ext2"}, {Name: "ext3"},
+		},
+		Groups: map[string][]string{
+			"code":   {"ext1", "ext2"},
+			"cursor": {"ext3"},
+		},
+	}
+	// All group values should be in Outdated names.
+	outdatedNames := make(map[string]bool)
+	for _, item := range result.Outdated {
+		outdatedNames[item.Name] = true
+	}
+	for group, names := range result.Groups {
+		for _, name := range names {
+			if !outdatedNames[name] {
+				t.Errorf("group %q contains %q which is not in Outdated", group, name)
+			}
+		}
+	}
+	// Total grouped items should equal total outdated items.
+	totalGrouped := 0
+	for _, names := range result.Groups {
+		totalGrouped += len(names)
+	}
+	if totalGrouped != len(result.Outdated) {
+		t.Errorf("grouped item count (%d) != outdated item count (%d)", totalGrouped, len(result.Outdated))
+	}
+}
+
+func TestScanResult_GroupsNil(t *testing.T) {
+	result := provider.ScanResult{
+		Available: true,
+		Outdated: []provider.OutdatedItem{
+			{Name: "pkg1"},
+		},
+	}
+	if result.Groups != nil {
+		t.Error("expected Groups to be nil for non-grouped provider")
+	}
+}
