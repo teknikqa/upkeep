@@ -37,8 +37,8 @@ else
     printf '==> golangci-lint not found — skipping (install: https://golangci-lint.run/docs/install/)\n'
 fi
 
-# 5. Tests
-printf '==> go test ./...\n'
-go test ./... -timeout 120s
+# 5. Tests (with race detector, matching CI).
+printf '==> go test -race ./...\n'
+go test -race ./... -timeout 120s
 
 printf '==> pre-commit: all checks passed\n'
