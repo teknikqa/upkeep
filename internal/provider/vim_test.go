@@ -2,6 +2,8 @@ package provider_test
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -98,5 +100,82 @@ func TestVimProvider_Registered(t *testing.T) {
 	}
 	if p.Name() != "vim" {
 		t.Errorf("expected vim, got %s", p.Name())
+	}
+}
+
+// TestDownloadFile_Success verifies that a 200 response body is written to dest.
+func TestDownloadFile_Success(t *testing.T) {
+	const content = "pathogen content"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(content))
+	}))
+	defer srv.Close()
+
+	dest := filepath.Join(t.TempDir(), "pathogen.vim")
+	err := provider.ExportDownloadFile(context.Background(), srv.URL, dest)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	got, err := os.ReadFile(dest)
+	if err != nil {
+		t.Fatalf("reading dest file: %v", err)
+	}
+	if string(got) != content {
+		t.Errorf("expected %q, got %q", content, string(got))
+	}
+}
+
+// TestDownloadFile_Non200 verifies that a non-200 HTTP status returns an error.
+func TestDownloadFile_Non200(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	dest := filepath.Join(t.TempDir(), "pathogen.vim")
+	err := provider.ExportDownloadFile(context.Background(), srv.URL, dest)
+	if err == nil {
+		t.Fatal("expected error for 404 response, got nil")
+	}
+}
+
+// TestDownloadFile_ContextCancelled verifies that a cancelled context returns an error.
+func TestDownloadFile_ContextCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // pre-cancel
+
+	dest := filepath.Join(t.TempDir(), "pathogen.vim")
+	// Any URL will do — context is already cancelled before the request starts.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	err := provider.ExportDownloadFile(ctx, srv.URL, dest)
+	if err == nil {
+		t.Fatal("expected error for cancelled context, got nil")
+	}
+}
+
+// TestDownloadFile_CreatesParentDirs verifies that missing parent directories are
+// created automatically before writing the destination file.
+func TestDownloadFile_CreatesParentDirs(t *testing.T) {
+	const content = "data"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(content))
+	}))
+	defer srv.Close()
+
+	dest := filepath.Join(t.TempDir(), "deep", "nested", "dir", "pathogen.vim")
+	err := provider.ExportDownloadFile(context.Background(), srv.URL, dest)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if _, err := os.Stat(dest); err != nil {
+		t.Errorf("expected dest file to exist: %v", err)
 	}
 }

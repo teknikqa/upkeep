@@ -329,3 +329,58 @@ func TestWrapPackages(t *testing.T) {
 		})
 	}
 }
+
+// TestStatusLine_AllStatuses verifies that StatusLine produces expected fields
+// for all known status values.
+func TestStatusLine_AllStatuses(t *testing.T) {
+	statuses := []string{"success", "failed", "partial", "skipped", "unavailable", "unknown"}
+	for _, s := range statuses {
+		t.Run(s, func(t *testing.T) {
+			var buf bytes.Buffer
+			ui.StatusLine(&buf, "Test Provider", s, 1, 2, 3, 4, 100*time.Millisecond)
+			out := buf.String()
+			if !strings.Contains(out, "Test Provider") {
+				t.Errorf("StatusLine(%q): missing provider name in %q", s, out)
+			}
+			if !strings.Contains(out, "updated=1") {
+				t.Errorf("StatusLine(%q): missing updated count in %q", s, out)
+			}
+		})
+	}
+}
+
+// TestStatusLine_NilWriter verifies StatusLine with nil writer doesn't panic.
+func TestStatusLine_NilWriter(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("StatusLine with nil writer panicked: %v", r)
+		}
+	}()
+	// nil writer falls back to os.Stdout — just ensure no panic.
+	ui.StatusLine(nil, "Test", "success", 0, 0, 0, 0, time.Second)
+}
+
+// TestScanSummaryRowsFromResults_NilResult verifies empty/nil results produce zero rows.
+func TestScanSummaryRowsFromResults_NilResult(t *testing.T) {
+	rows := ui.ScanSummaryRowsFromResults(nil, nil)
+	if len(rows) != 0 {
+		t.Errorf("expected 0 rows for nil results, got %d", len(rows))
+	}
+}
+
+// TestScanSummaryRowsFromResults_MissingDisplayName verifies that a provider
+// with no entry in displayNames falls back to its name as the display name.
+func TestScanSummaryRowsFromResults_MissingDisplayName(t *testing.T) {
+	results := map[string]provider.ScanResult{
+		"pip": {Available: true},
+	}
+	rows := ui.ScanSummaryRowsFromResults(results, map[string]string{}) // no display names
+
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(rows))
+	}
+	// display name should fall back to provider name
+	if rows[0].ProviderName != "pip" {
+		t.Errorf("expected ProviderName=pip, got %q", rows[0].ProviderName)
+	}
+}

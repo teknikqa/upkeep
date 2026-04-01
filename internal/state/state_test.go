@@ -213,3 +213,17 @@ func TestDefaultStatePath_ContainsHome(t *testing.T) {
 		t.Errorf("DefaultStatePath() = %q should end with last-run.json", got)
 	}
 }
+
+// TestSave_ReadOnlyDir verifies that Save fails gracefully when the parent
+// directory cannot be created or written to.
+func TestSave_ReadOnlyDir(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root can write anywhere — skipping read-only dir test")
+	}
+	// /dev/null is a file, not a directory, so creating a child under it fails.
+	s := state.New("/dev/null/impossible/last-run.json")
+	err := s.Save()
+	if err == nil {
+		t.Fatal("expected error saving to /dev/null/impossible, got nil")
+	}
+}

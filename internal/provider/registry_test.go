@@ -171,3 +171,47 @@ func TestGlobal_GetByNames_Subset(t *testing.T) {
 		t.Errorf("expected 2 providers, got %d", len(ps))
 	}
 }
+
+// TestProvider_DisplayNameAndDependsOn verifies that every registered provider
+// returns the expected human-readable display name and dependency list.
+func TestProvider_DisplayNameAndDependsOn(t *testing.T) {
+	tests := []struct {
+		name        string
+		displayName string
+		deps        []string
+	}{
+		{"brew", "Homebrew Formulae", nil},
+		{"brew-cask", "Homebrew Casks", []string{"brew"}},
+		{"composer", "Composer Global Packages", nil},
+		{"editor", "Code Editor Extensions", nil},
+		{"npm", "npm Global Packages", nil},
+		{"omz", "Oh My Zsh", nil},
+		{"pip", "pip / pipx", nil},
+		{"rust", "Rust (rustup + cargo)", nil},
+		{"vagrant", "Vagrant", nil},
+		{"vim", "Vim Plugins", nil},
+		{"virtualbox", "VirtualBox", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, err := provider.Get(tt.name)
+			if err != nil {
+				t.Fatalf("Get(%q): %v", tt.name, err)
+			}
+			if got := p.DisplayName(); got != tt.displayName {
+				t.Errorf("DisplayName() = %q, want %q", got, tt.displayName)
+			}
+			deps := p.DependsOn()
+			if len(deps) != len(tt.deps) {
+				t.Errorf("DependsOn() len = %d, want %d; got %v", len(deps), len(tt.deps), deps)
+				return
+			}
+			for i, d := range deps {
+				if d != tt.deps[i] {
+					t.Errorf("DependsOn()[%d] = %q, want %q", i, d, tt.deps[i])
+				}
+			}
+		})
+	}
+}

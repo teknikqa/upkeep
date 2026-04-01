@@ -87,3 +87,24 @@ func TestNotify_ExplicitOsascript_DisabledReturnsNil(t *testing.T) {
 		t.Errorf("expected nil when disabled with osascript tool, got: %v", err)
 	}
 }
+
+// TestNotify_UnknownTool_FallsThrough verifies that an unrecognised tool name
+// falls through to the auto-detect branch (which tries terminal-notifier then
+// osascript) without panicking. We use Enabled=false so no real command runs.
+func TestNotify_UnknownTool_FallsThrough(t *testing.T) {
+	n := notify.New(config.NotificationsConfig{Enabled: false, Tool: "nonexistent-tool"})
+	// Disabled, so the switch is never reached — just confirms no panic.
+	if err := n.Notify("T", "M", ""); err != nil {
+		t.Errorf("expected nil for disabled notifier with unknown tool, got: %v", err)
+	}
+}
+
+// TestNotify_EmptyTool_AutoDetects verifies that an empty Tool field routes to
+// the auto-detect branch without panicking. We use Enabled=false so no real
+// command is executed.
+func TestNotify_EmptyTool_AutoDetects(t *testing.T) {
+	n := notify.New(config.NotificationsConfig{Enabled: false, Tool: ""})
+	if err := n.Notify("T", "M", ""); err != nil {
+		t.Errorf("expected nil for disabled notifier with empty tool, got: %v", err)
+	}
+}

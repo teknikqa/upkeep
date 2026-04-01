@@ -105,3 +105,6 @@ func ParseExtensionList(output string) []marketplace.Extension {
 func CompareVersions(installed []marketplace.Extension, latest map[string]marketplace.LatestVersion) []OutdatedItem {
 	return compareVersions(installed, latest)
 }
+
+// ExportDownloadFile exposes downloadFile for testing.
+var ExportDownloadFile = downloadFile
