@@ -21,6 +21,56 @@ import (
 // the last column.
 var trailingPadRe = regexp.MustCompile(`\s+(\x1b\[[0-9;]*m\s*)*$`)
 
+// defaultTermWidth is the fallback when terminal width cannot be detected.
+const defaultTermWidth = 80
+
+// termWidth returns the current terminal width, or defaultTermWidth if
+// detection fails (e.g. not a TTY).
+func termWidth() int {
+	w, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil || w <= 0 {
+		return defaultTermWidth
+	}
+	return w
+}
+
+// WrapPackages splits a list of package names into lines that each fit within
+// maxWidth columns when joined by ", ".  Each returned string is a
+// comma-separated chunk ready for display.  If maxWidth is too small to hold
+// even a single package name, each package gets its own line.
+func WrapPackages(pkgs []string, maxWidth int) []string {
+	if len(pkgs) == 0 {
+		return []string{"-"}
+	}
+	if maxWidth <= 0 {
+		maxWidth = 1
+	}
+
+	var lines []string
+	var cur strings.Builder
+	for _, p := range pkgs {
+		if cur.Len() == 0 {
+			// First package on this line — always add it regardless of width.
+			cur.WriteString(p)
+			continue
+		}
+		// Would appending ", pkg" exceed the budget?
+		addition := ", " + p
+		if cur.Len()+len(addition) > maxWidth {
+			// Flush current line, start a new one.
+			lines = append(lines, cur.String())
+			cur.Reset()
+			cur.WriteString(p)
+		} else {
+			cur.WriteString(addition)
+		}
+	}
+	if cur.Len() > 0 {
+		lines = append(lines, cur.String())
+	}
+	return lines
+}
+
 // IsTTY returns true if stdout is a terminal.
 func IsTTY() bool {
 	return term.IsTerminal(int(os.Stdout.Fd()))
@@ -53,6 +103,8 @@ type UpdateSummaryRow struct {
 // RenderScanSummaryTable renders a pre-update scan summary table to stdout.
 // When a row has PackageGroups, it renders a parent row (total count, no packages)
 // followed by indented sub-rows per group (group count + packages).
+// Long package lists are wrapped across multiple continuation rows so they
+// stay within the Packages column.
 func RenderScanSummaryTable(rows []ScanSummaryRow) {
 	if len(rows) == 0 {
 		fmt.Println("No providers available or nothing to update.")
@@ -60,9 +112,15 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) {
 	}
 
 	if IsTTY() {
-		data := pterm.TableData{
-			{"Provider", "Status", "Outdated", "Packages"},
+		// First pass: build intermediate rows to measure column widths.
+		type ttyRow struct {
+			provider string
+			status   string
+			outdated string
+			packages []string // pre-split package names (not yet wrapped)
 		}
+		var intermediate []ttyRow
+
 		for _, r := range rows {
 			status := "✅ available"
 			if !r.Available {
@@ -76,18 +134,58 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) {
 			}
 
 			if len(r.PackageGroups) > 0 {
-				// Parent row: total count, no packages.
-				data = append(data, []string{r.DisplayName, status, outdated, ""})
-				// Sub-rows per group.
+				intermediate = append(intermediate, ttyRow{r.DisplayName, status, outdated, nil})
 				for _, sub := range GroupSubRows(r.PackageGroups) {
-					data = append(data, []string{
-						sub.Label, status, fmt.Sprintf("%d", sub.Count), sub.Packages,
+					intermediate = append(intermediate, ttyRow{
+						sub.Label, status, fmt.Sprintf("%d", sub.Count), sub.PkgNames,
 					})
 				}
 			} else {
-				data = append(data, []string{r.DisplayName, status, outdated, formatPackageList(r.Packages)})
+				intermediate = append(intermediate, ttyRow{
+					r.DisplayName, status, outdated, r.Packages,
+				})
 			}
 		}
+
+		// Measure max widths of the first three columns (including headers).
+		provW := len("Provider")
+		statusW := len("Status")
+		outdatedW := len("Outdated")
+		for _, ir := range intermediate {
+			if len(ir.provider) > provW {
+				provW = len(ir.provider)
+			}
+			if len(ir.status) > statusW {
+				statusW = len(ir.status)
+			}
+			if len(ir.outdated) > outdatedW {
+				outdatedW = len(ir.outdated)
+			}
+		}
+
+		// pterm uses " | " (3 chars) between each column pair:
+		//   provW + 3 + statusW + 3 + outdatedW + 3 = prefix before Packages
+		prefixWidth := provW + statusW + outdatedW + 9
+		tw := termWidth()
+		maxPkgWidth := tw - prefixWidth
+		if maxPkgWidth < 10 {
+			maxPkgWidth = 10
+		}
+
+		// Second pass: wrap packages and build final pterm data.
+		data := pterm.TableData{
+			{"Provider", "Status", "Outdated", "Packages"},
+		}
+		for _, ir := range intermediate {
+			pkgLines := WrapPackages(ir.packages, maxPkgWidth)
+			// First line carries the provider/status/outdated columns.
+			data = append(data, []string{ir.provider, ir.status, ir.outdated, pkgLines[0]})
+			// Continuation lines: blank first 3 columns.
+			for _, cont := range pkgLines[1:] {
+				data = append(data, []string{"", "", "", cont})
+			}
+		}
+
 		rendered, _ := pterm.DefaultTable.WithHasHeader().WithData(data).Srender()
 		// pterm pads the last column to the max width which causes line
 		// wrapping in narrow terminals.  Strip trailing whitespace per line,
@@ -96,6 +194,14 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) {
 			fmt.Println(trailingPadRe.ReplaceAllString(line, ""))
 		}
 	} else {
+		// Non-TTY: fixed-width prefix columns (25+1 + 15+1 + 8+1 = 51 chars).
+		const nonTTYPrefix = 51
+		tw := termWidth()
+		maxPkgWidth := tw - nonTTYPrefix
+		if maxPkgWidth < 10 {
+			maxPkgWidth = 10
+		}
+
 		fmt.Printf("%-25s %-15s %-8s %s\n", "Provider", "Status", "Outdated", "Packages")
 		fmt.Printf("%-25s %-15s %-8s %s\n", "--------", "------", "--------", "--------")
 		for _, r := range rows {
@@ -111,14 +217,20 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) {
 			}
 
 			if len(r.PackageGroups) > 0 {
-				// Parent row: total count, no packages.
 				fmt.Printf("%-25s %-15s %-8s\n", r.DisplayName, status, outdated)
-				// Sub-rows per group.
 				for _, sub := range GroupSubRows(r.PackageGroups) {
-					fmt.Printf("%25s %-15s %-8d %s\n", sub.Label, status, sub.Count, sub.Packages)
+					pkgLines := WrapPackages(sub.PkgNames, maxPkgWidth)
+					fmt.Printf("%25s %-15s %-8d %s\n", sub.Label, status, sub.Count, pkgLines[0])
+					for _, cont := range pkgLines[1:] {
+						fmt.Printf("%25s %-15s %-8s %s\n", "", "", "", cont)
+					}
 				}
 			} else {
-				fmt.Printf("%-25s %-15s %-8s %s\n", r.DisplayName, status, outdated, formatPackageList(r.Packages))
+				pkgLines := WrapPackages(r.Packages, maxPkgWidth)
+				fmt.Printf("%-25s %-15s %-8s %s\n", r.DisplayName, status, outdated, pkgLines[0])
+				for _, cont := range pkgLines[1:] {
+					fmt.Printf("%-25s %-15s %-8s %s\n", "", "", "", cont)
+				}
 			}
 		}
 	}
@@ -247,9 +359,10 @@ func formatPackageList(pkgs []string) string {
 
 // GroupSubRow represents one sub-group line in a grouped scan summary.
 type GroupSubRow struct {
-	Label    string // tree-prefixed group label (e.g. "  ├ code", "  └ cursor")
-	Count    int    // number of packages in this group
-	Packages string // comma-separated package names
+	Label    string   // tree-prefixed group label (e.g. "  ├ code", "  └ cursor")
+	Count    int      // number of packages in this group
+	Packages string   // comma-separated package names
+	PkgNames []string // raw package names (for wrapping)
 }
 
 // GroupSubRows expands a Groups map into sorted sub-rows for table rendering.
@@ -283,6 +396,7 @@ func GroupSubRows(groups map[string][]string) []GroupSubRow {
 			Label:    prefix + k,
 			Count:    len(groups[k]),
 			Packages: strings.Join(groups[k], ", "),
+			PkgNames: groups[k],
 		})
 	}
 	return rows

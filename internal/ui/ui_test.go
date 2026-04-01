@@ -274,3 +274,79 @@ func TestGroupSubRows(t *testing.T) {
 		})
 	}
 }
+
+func TestWrapPackages(t *testing.T) {
+	tests := []struct {
+		name     string
+		pkgs     []string
+		maxWidth int
+		want     []string
+	}{
+		{
+			name:     "empty list returns dash",
+			pkgs:     nil,
+			maxWidth: 40,
+			want:     []string{"-"},
+		},
+		{
+			name:     "fits on one line",
+			pkgs:     []string{"git", "jq", "ripgrep"},
+			maxWidth: 40,
+			want:     []string{"git, jq, ripgrep"},
+		},
+		{
+			name:     "wraps to two lines",
+			pkgs:     []string{"alpha", "bravo", "charlie", "delta", "echo"},
+			maxWidth: 20,
+			want:     []string{"alpha, bravo", "charlie, delta, echo"},
+		},
+		{
+			name:     "single package per line when narrow",
+			pkgs:     []string{"longpkgname1", "longpkgname2", "longpkgname3"},
+			maxWidth: 12,
+			want:     []string{"longpkgname1", "longpkgname2", "longpkgname3"},
+		},
+		{
+			name:     "single package always on first line even if wider than maxWidth",
+			pkgs:     []string{"very-long-package-name"},
+			maxWidth: 5,
+			want:     []string{"very-long-package-name"},
+		},
+		{
+			name: "many packages wraps correctly",
+			pkgs: []string{
+				"bmewburn.vscode-intelephense-client",
+				"github.copilot-chat",
+				"ms-python.debugpy",
+				"ms-python.python",
+				"ms-python.vscode-python-envs",
+				"ms-vscode-remote.remote-containers",
+				"ms-vscode.makefile-tools",
+				"openai.chatgpt",
+				"redhat.vscode-xml",
+				"redhat.vscode-yaml",
+			},
+			maxWidth: 60,
+			want: []string{
+				"bmewburn.vscode-intelephense-client, github.copilot-chat",
+				"ms-python.debugpy, ms-python.python",
+				"ms-python.vscode-python-envs",
+				"ms-vscode-remote.remote-containers, ms-vscode.makefile-tools",
+				"openai.chatgpt, redhat.vscode-xml, redhat.vscode-yaml",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ui.WrapPackages(tt.pkgs, tt.maxWidth)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %d lines, want %d\ngot:  %v\nwant: %v", len(got), len(tt.want), got, tt.want)
+			}
+			for i, want := range tt.want {
+				if got[i] != want {
+					t.Errorf("line %d: got %q, want %q", i, got[i], want)
+				}
+			}
+		})
+	}
+}
