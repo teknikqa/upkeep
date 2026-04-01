@@ -11,7 +11,10 @@ import (
 type ExecuteOptions struct {
 	// Parallelism is the max number of concurrent provider executions.
 	Parallelism int
-	// OnComplete is called after each provider finishes (for progress bar updates, etc.).
+	// OnStart is called just before each provider begins updating (after
+	// dependencies are met and a semaphore slot is acquired).
+	OnStart func(name string)
+	// OnComplete is called after each provider finishes (for live table updates, etc.).
 	OnComplete func(name string, result provider.UpdateResult)
 }
 
@@ -53,6 +56,11 @@ func Execute(ctx context.Context, providers []provider.Provider, scanResults map
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
+
+			// Notify that this provider is starting.
+			if opts.OnStart != nil {
+				opts.OnStart(p.Name())
+			}
 
 			// Get the items to update from the scan results.
 			scanResult := scanResults[p.Name()]

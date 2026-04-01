@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -241,6 +242,71 @@ func TestExecute_AllResultsCollected(t *testing.T) {
 	}
 	if len(results["b"].Deferred) != 1 || results["b"].Deferred[0] != "y" {
 		t.Errorf("unexpected result for b: %+v", results["b"])
+	}
+}
+
+// TestExecute_OnStartCalledBeforeOnComplete verifies that OnStart fires before
+// OnComplete for each provider and is called exactly once per provider.
+func TestExecute_OnStartCalledBeforeOnComplete(t *testing.T) {
+	var mu sync.Mutex
+	var events []string
+
+	providers := []provider.Provider{
+		&mockProvider{name: "brew", updateResult: provider.UpdateResult{Updated: []string{"git"}}},
+		&mockProvider{name: "npm", updateResult: provider.UpdateResult{}},
+		&mockProvider{name: "pip", updateResult: provider.UpdateResult{}},
+	}
+	scanResults := map[string]provider.ScanResult{
+		"brew": {Available: true},
+		"npm":  {Available: true},
+		"pip":  {Available: true},
+	}
+
+	results := engine.Execute(context.Background(), providers, scanResults, engine.ExecuteOptions{
+		Parallelism: 3,
+		OnStart: func(name string) {
+			mu.Lock()
+			events = append(events, "start:"+name)
+			mu.Unlock()
+		},
+		OnComplete: func(name string, result provider.UpdateResult) {
+			mu.Lock()
+			events = append(events, "complete:"+name)
+			mu.Unlock()
+		},
+	})
+
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(results))
+	}
+
+	// Verify each provider has exactly one start and one complete event,
+	// and that start precedes complete for each provider.
+	for _, name := range []string{"brew", "npm", "pip"} {
+		startIdx, completeIdx := -1, -1
+		for i, e := range events {
+			if e == "start:"+name {
+				if startIdx != -1 {
+					t.Errorf("%s: OnStart called more than once", name)
+				}
+				startIdx = i
+			}
+			if e == "complete:"+name {
+				if completeIdx != -1 {
+					t.Errorf("%s: OnComplete called more than once", name)
+				}
+				completeIdx = i
+			}
+		}
+		if startIdx == -1 {
+			t.Errorf("%s: OnStart never called", name)
+		}
+		if completeIdx == -1 {
+			t.Errorf("%s: OnComplete never called", name)
+		}
+		if startIdx != -1 && completeIdx != -1 && startIdx > completeIdx {
+			t.Errorf("%s: OnStart (idx %d) must precede OnComplete (idx %d)", name, startIdx, completeIdx)
+		}
 	}
 }
 

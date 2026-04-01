@@ -72,13 +72,9 @@ func BuildReport(
 	return reports
 }
 
-// PrintReport writes per-provider status lines and a final summary table.
+// PrintReport writes a final summary table.
+// Per-provider status lines are now shown in the LiveUpdateTable during execution.
 func PrintReport(w io.Writer, reports []ProviderReport, totalDuration time.Duration) {
-	// Per-provider status lines.
-	for _, r := range reports {
-		ui.StatusLine(w, r.DisplayName, r.Status, r.Updated, r.Deferred, r.Failed, r.Duration)
-	}
-
 	// Summary table.
 	rows := make([]ui.UpdateSummaryRow, 0, len(reports))
 	for _, r := range reports {

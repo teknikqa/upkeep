@@ -104,7 +104,7 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 	// Phase 2: Render scan summary.
 	displayNames := buildDisplayNames(providers)
 	summaryRows := ui.ScanSummaryRowsFromResults(scanResults, displayNames)
-	ui.RenderScanSummaryTable(summaryRows)
+	scanTableLines := ui.RenderScanSummaryTable(summaryRows)
 
 	// Phase 3: Dry-run check.
 	if opts.DryRun {
@@ -139,9 +139,8 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 	}
 
 	// Phase 5: Execute.
-	fmt.Fprintln(out, "\nRunning updates...")
 	runStart := time.Now()
-	progressIncrement := ui.ProgressBar(len(providers))
+	liveTable := ui.NewLiveUpdateTable(summaryRows, scanTableLines, out)
 
 	// Wire verbose mode: tee provider subprocess output to console when --verbose.
 	if opts.Verbose {
@@ -151,10 +150,14 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 
 	updateResults := Execute(ctx, providers, scanResults, ExecuteOptions{
 		Parallelism: e.cfg.Parallelism,
+		OnStart: func(name string) {
+			liveTable.OnProviderStart(name)
+		},
 		OnComplete: func(name string, result provider.UpdateResult) {
-			progressIncrement()
+			liveTable.OnProviderComplete(name, result)
 		},
 	})
+	liveTable.Stop()
 
 	totalDuration := time.Since(runStart)
 

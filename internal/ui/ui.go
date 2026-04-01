@@ -105,10 +105,11 @@ type UpdateSummaryRow struct {
 // followed by indented sub-rows per group (group count + packages).
 // Long package lists are wrapped across multiple continuation rows so they
 // stay within the Packages column.
-func RenderScanSummaryTable(rows []ScanSummaryRow) {
+// Returns the number of lines printed (for TTY live-table takeover).
+func RenderScanSummaryTable(rows []ScanSummaryRow) int {
 	if len(rows) == 0 {
 		fmt.Println("No providers available or nothing to update.")
-		return
+		return 1
 	}
 
 	if IsTTY() {
@@ -190,9 +191,11 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) {
 		// pterm pads the last column to the max width which causes line
 		// wrapping in narrow terminals.  Strip trailing whitespace per line,
 		// including whitespace wrapped inside ANSI escape sequences.
-		for _, line := range strings.Split(strings.TrimRight(rendered, "\n"), "\n") {
+		lines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+		for _, line := range lines {
 			fmt.Println(trailingPadRe.ReplaceAllString(line, ""))
 		}
+		return len(lines)
 	} else {
 		// Non-TTY: fixed-width prefix columns (25+1 + 15+1 + 8+1 = 51 chars).
 		const nonTTYPrefix = 51
@@ -234,6 +237,7 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) {
 			}
 		}
 	}
+	return 0
 }
 
 // RenderFinalReport renders the final update report table.
