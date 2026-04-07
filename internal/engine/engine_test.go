@@ -123,6 +123,39 @@ func TestScan_UnavailableProviderMarkedCorrectly(t *testing.T) {
 	}
 }
 
+func TestScan_OnCompleteCallbackFired(t *testing.T) {
+	providers := []provider.Provider{
+		&mockProvider{name: "brew", scanResult: provider.ScanResult{Available: true, Outdated: []provider.OutdatedItem{{Name: "git"}}}},
+		&mockProvider{name: "npm", scanResult: provider.ScanResult{Available: true}},
+		&mockProvider{name: "pip", scanResult: provider.ScanResult{Available: false}},
+	}
+
+	var mu sync.Mutex
+	completed := make(map[string]provider.ScanResult)
+
+	engine.Scan(context.Background(), providers, engine.ScanOptions{
+		Parallelism: 3,
+		OnComplete: func(name string, result provider.ScanResult) {
+			mu.Lock()
+			completed[name] = result
+			mu.Unlock()
+		},
+	})
+
+	if len(completed) != 3 {
+		t.Fatalf("expected OnComplete called 3 times, got %d", len(completed))
+	}
+	if !completed["brew"].Available {
+		t.Error("expected brew to be available in callback")
+	}
+	if len(completed["brew"].Outdated) != 1 {
+		t.Errorf("expected 1 outdated for brew in callback, got %d", len(completed["brew"].Outdated))
+	}
+	if completed["pip"].Available {
+		t.Error("expected pip to be unavailable in callback")
+	}
+}
+
 func TestScan_ContextCancellationStopsPending(t *testing.T) {
 	// Use parallelism=1 and slow providers so cancellation races properly.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)

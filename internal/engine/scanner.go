@@ -15,6 +15,10 @@ type ScanOptions struct {
 	Parallelism int
 	// SkipLists maps provider name → set of package names to exclude from results.
 	SkipLists map[string]map[string]bool
+	// OnComplete is called after each provider's scan finishes with the
+	// provider name and its (skip-list-filtered) ScanResult. Called from the
+	// scanning goroutine — must be safe for concurrent use.
+	OnComplete func(name string, result provider.ScanResult)
 }
 
 // Scan runs all provided providers in parallel (bounded by opts.Parallelism),
@@ -78,6 +82,10 @@ func Scan(ctx context.Context, providers []provider.Provider, opts ScanOptions) 
 			mu.Lock()
 			results[p.Name()] = result
 			mu.Unlock()
+
+			if opts.OnComplete != nil {
+				opts.OnComplete(p.Name(), result)
+			}
 		}()
 	}
 

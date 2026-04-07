@@ -25,6 +25,16 @@ func (p *EditorProvider) Name() string        { return "editor" }
 func (p *EditorProvider) DisplayName() string { return "Code Editor Extensions" }
 func (p *EditorProvider) DependsOn() []string { return nil }
 
+// SubGroups returns the configured editor names so the UI can show sub-group
+// rows before scanning completes.
+func (p *EditorProvider) SubGroups() []string {
+	editors := p.cfg.Editors
+	if len(editors) == 0 {
+		editors = []string{"code", "cursor", "kiro", "windsurf", "agy"}
+	}
+	return editors
+}
+
 // Scan checks which configured editors are installed and queries marketplace APIs
 // to detect which extensions are actually outdated.
 // If marketplace queries fail, Scan degrades gracefully: AlwaysUpdate ensures

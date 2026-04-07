@@ -91,20 +91,41 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 	// Build skip-lists from config.
 	skipLists := buildSkipLists(e.cfg)
 
-	// Phase 1: Scan.
-	fmt.Fprintln(out, "Scanning for updates...")
+	// Build display names and provider order for the live scan table.
+	displayNames := buildDisplayNames(providers)
+	providerOrder := make([]string, len(providers))
+	subGroups := make(map[string][]string)
+	for i, p := range providers {
+		providerOrder[i] = p.Name()
+		if sg, ok := p.(provider.SubGrouper); ok {
+			subGroups[p.Name()] = sg.SubGroups()
+		}
+	}
+
+	// Phase 1: Scan with live progress table.
+	liveScan := ui.NewLiveScanTable(providerOrder, displayNames, subGroups)
+	if !liveScan.IsActive() {
+		// Non-TTY fallback: print a simple header.
+		fmt.Fprintln(out, "Scanning for updates...")
+	}
 	scanStart := time.Now()
 	scanResults := Scan(ctx, providers, ScanOptions{
 		Parallelism: e.cfg.Parallelism,
 		SkipLists:   skipLists,
+		OnComplete: func(name string, result provider.ScanResult) {
+			liveScan.OnScanComplete(name, result)
+		},
 	})
 	scanDuration := time.Since(scanStart)
 	e.logger.Info("scan completed in %s", scanDuration)
 
-	// Phase 2: Render scan summary.
-	displayNames := buildDisplayNames(providers)
-	summaryRows := ui.ScanSummaryRowsFromResults(scanResults, displayNames)
-	scanTableLines := ui.RenderScanSummaryTable(summaryRows)
+	// Phase 2: Finalise the live scan table → static summary.
+	summaryRows, scanTableLines := liveScan.Stop()
+	if !liveScan.IsActive() {
+		// Non-TTY: render the static table (live table didn't render).
+		summaryRows = ui.ScanSummaryRowsFromResults(scanResults, displayNames)
+		scanTableLines = ui.RenderScanSummaryTable(summaryRows)
+	}
 
 	// Phase 3: Dry-run check.
 	if opts.DryRun {

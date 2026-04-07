@@ -57,3 +57,12 @@ type Provider interface {
 	// The items slice contains only the items the user confirmed for update.
 	Update(ctx context.Context, items []OutdatedItem) UpdateResult
 }
+
+// SubGrouper is an optional interface that providers can implement to declare
+// their sub-group labels upfront (before scanning). This allows the UI to
+// show sub-group rows in the scan table immediately rather than waiting for
+// scan results.
+type SubGrouper interface {
+	// SubGroups returns the labels of sub-groups this provider will report.
+	SubGroups() []string
+}
