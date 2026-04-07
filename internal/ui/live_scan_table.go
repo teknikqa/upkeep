@@ -165,12 +165,7 @@ func (t *LiveScanTable) render() {
 
 		// Provider scan is done — build row from result.
 		r := s.result
-		status := "✅ available"
-		if !r.Available {
-			status = "⏭ unavailable"
-		} else if r.Error != nil {
-			status = "❌ scan error"
-		}
+		status := scanStatusLabel(r.Available, r.Error, len(r.Outdated))
 		outdated := fmt.Sprintf("%d", len(r.Outdated))
 		if !r.Available {
 			outdated = "-"
@@ -261,12 +256,7 @@ func (t *LiveScanTable) renderFinal() {
 		}
 
 		r := s.result
-		status := "✅ available"
-		if !r.Available {
-			status = "⏭ unavailable"
-		} else if r.Error != nil {
-			status = "❌ scan error"
-		}
+		status := scanStatusLabel(r.Available, r.Error, len(r.Outdated))
 		outdated := fmt.Sprintf("%d", len(r.Outdated))
 		if !r.Available {
 			outdated = "-"
@@ -399,7 +389,8 @@ func (t *LiveScanTable) allSubGroupRows(providerName string, groups map[string][
 		// Fall back to whatever groups the scan returned.
 		var rows []scanTableRow
 		for _, sub := range GroupSubRows(groups) {
-			rows = append(rows, scanTableRow{sub.Label, status, fmt.Sprintf("%d", sub.Count), sub.PkgNames})
+			subStatus := scanStatusLabel(true, nil, sub.Count)
+			rows = append(rows, scanTableRow{sub.Label, subStatus, fmt.Sprintf("%d", sub.Count), sub.PkgNames})
 		}
 		return rows
 	}
@@ -413,9 +404,9 @@ func (t *LiveScanTable) allSubGroupRows(providerName string, groups map[string][
 		label := prefix + g
 
 		if pkgs, ok := groups[g]; ok && len(pkgs) > 0 {
-			rows = append(rows, scanTableRow{label, status, fmt.Sprintf("%d", len(pkgs)), pkgs})
+			rows = append(rows, scanTableRow{label, scanStatusLabel(true, nil, len(pkgs)), fmt.Sprintf("%d", len(pkgs)), pkgs})
 		} else {
-			rows = append(rows, scanTableRow{label, status, "0", nil})
+			rows = append(rows, scanTableRow{label, scanStatusLabel(true, nil, 0), "0", nil})
 		}
 	}
 	return rows

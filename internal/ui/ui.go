@@ -76,6 +76,21 @@ func IsTTY() bool {
 	return term.IsTerminal(int(os.Stdout.Fd()))
 }
 
+// scanStatusLabel returns the TTY status label for a scan row based on
+// availability, error, and outdated count.
+func scanStatusLabel(available bool, err error, outdatedCount int) string {
+	if !available {
+		return "⏭ unavailable"
+	}
+	if err != nil {
+		return "❌ scan error"
+	}
+	if outdatedCount > 0 {
+		return "✅ available"
+	}
+	return "✅ up to date"
+}
+
 // ScanSummaryRow represents one row in the pre-update scan summary table.
 type ScanSummaryRow struct {
 	ProviderName  string
@@ -110,12 +125,7 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) int {
 		var intermediate []ttyRow
 
 		for _, r := range rows {
-			status := "✅ available"
-			if !r.Available {
-				status = "⏭ unavailable"
-			} else if r.Error != nil {
-				status = "❌ scan error"
-			}
+			status := scanStatusLabel(r.Available, r.Error, r.OutdatedCount)
 			outdated := fmt.Sprintf("%d", r.OutdatedCount)
 			if !r.Available {
 				outdated = "-"
@@ -124,8 +134,9 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) int {
 			if len(r.PackageGroups) > 0 {
 				intermediate = append(intermediate, ttyRow{r.DisplayName, status, outdated, nil})
 				for _, sub := range GroupSubRows(r.PackageGroups) {
+					subStatus := scanStatusLabel(r.Available, r.Error, sub.Count)
 					intermediate = append(intermediate, ttyRow{
-						sub.Label, status, fmt.Sprintf("%d", sub.Count), sub.PkgNames,
+						sub.Label, subStatus, fmt.Sprintf("%d", sub.Count), sub.PkgNames,
 					})
 				}
 			} else {
@@ -195,11 +206,16 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) int {
 		fmt.Printf("%-25s %-15s %-8s %s\n", "Provider", "Status", "Outdated", "Packages")
 		fmt.Printf("%-25s %-15s %-8s %s\n", "--------", "------", "--------", "--------")
 		for _, r := range rows {
-			status := "available"
-			if !r.Available {
+			var status string
+			switch {
+			case !r.Available:
 				status = "unavailable"
-			} else if r.Error != nil {
+			case r.Error != nil:
 				status = "scan error"
+			case r.OutdatedCount == 0:
+				status = "up to date"
+			default:
+				status = "available"
 			}
 			outdated := fmt.Sprintf("%d", r.OutdatedCount)
 			if !r.Available {
@@ -209,8 +225,12 @@ func RenderScanSummaryTable(rows []ScanSummaryRow) int {
 			if len(r.PackageGroups) > 0 {
 				fmt.Printf("%-25s %-15s %-8s\n", r.DisplayName, status, outdated)
 				for _, sub := range GroupSubRows(r.PackageGroups) {
+					subStatus := "available"
+					if sub.Count == 0 {
+						subStatus = "up to date"
+					}
 					pkgLines := WrapPackages(sub.PkgNames, maxPkgWidth)
-					fmt.Printf("%25s %-15s %-8d %s\n", sub.Label, status, sub.Count, pkgLines[0])
+					fmt.Printf("%25s %-15s %-8d %s\n", sub.Label, subStatus, sub.Count, pkgLines[0])
 					for _, cont := range pkgLines[1:] {
 						fmt.Printf("%25s %-15s %-8s %s\n", "", "", "", cont)
 					}
