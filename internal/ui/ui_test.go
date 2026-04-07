@@ -226,10 +226,11 @@ func TestGroupSubRows(t *testing.T) {
 			},
 		},
 		{
-			name:   "group with empty slice skipped",
+			name:   "group with empty slice included",
 			groups: map[string][]string{"code": {"ext1"}, "empty": {}},
 			want: []ui.GroupSubRow{
-				{Label: "  └ code", Count: 1, Packages: "ext1"},
+				{Label: "  ├ code", Count: 1, Packages: "ext1"},
+				{Label: "  └ empty", Count: 0, Packages: ""},
 			},
 		},
 	}

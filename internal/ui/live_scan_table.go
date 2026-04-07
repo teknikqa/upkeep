@@ -18,6 +18,14 @@ type providerScanState struct {
 	display string // display name
 }
 
+// scanTableRow is an intermediate row used during table rendering.
+type scanTableRow struct {
+	provider string
+	status   string
+	outdated string
+	packages []string
+}
+
 // LiveScanTable renders the scan summary table as a live-updating view during
 // the scan phase. On TTY it uses pterm's AreaPrinter to overwrite the table
 // in-place as each provider finishes; on non-TTY it is a no-op (the static
@@ -124,20 +132,14 @@ func (t *LiveScanTable) render() {
 
 	tw := termWidth()
 
-	type iRow struct {
-		provider string
-		status   string
-		outdated string
-		packages []string
-	}
-	var intermediate []iRow
+	var intermediate []scanTableRow
 
 	for _, name := range t.providerNames {
 		s := t.states[name]
 
 		if s.status == "scanning" {
 			// Show parent row.
-			intermediate = append(intermediate, iRow{
+			intermediate = append(intermediate, scanTableRow{
 				provider: s.display,
 				status:   "⏳ scanning",
 				outdated: "—",
@@ -150,7 +152,7 @@ func (t *LiveScanTable) render() {
 					if i == len(groups)-1 {
 						prefix = "  └ "
 					}
-					intermediate = append(intermediate, iRow{
+					intermediate = append(intermediate, scanTableRow{
 						provider: prefix + g,
 						status:   "⏳ scanning",
 						outdated: "—",
@@ -179,15 +181,14 @@ func (t *LiveScanTable) render() {
 			pkgNames = append(pkgNames, item.Name)
 		}
 
-		if len(r.Groups) > 0 {
-			intermediate = append(intermediate, iRow{s.display, status, outdated, nil})
-			for _, sub := range GroupSubRows(r.Groups) {
-				intermediate = append(intermediate, iRow{
-					sub.Label, status, fmt.Sprintf("%d", sub.Count), sub.PkgNames,
-				})
-			}
+		if knownGroups := t.subGroups[name]; len(knownGroups) > 0 {
+			intermediate = append(intermediate, scanTableRow{s.display, status, outdated, nil})
+			intermediate = append(intermediate, t.allSubGroupRows(name, r.Groups, status)...)
+		} else if len(r.Groups) > 0 {
+			intermediate = append(intermediate, scanTableRow{s.display, status, outdated, nil})
+			intermediate = append(intermediate, t.allSubGroupRows(name, r.Groups, status)...)
 		} else {
-			intermediate = append(intermediate, iRow{
+			intermediate = append(intermediate, scanTableRow{
 				s.display, status, outdated, pkgNames,
 			})
 		}
@@ -250,18 +251,12 @@ func (t *LiveScanTable) renderFinal() {
 
 	tw := termWidth()
 
-	type iRow struct {
-		provider string
-		status   string
-		outdated string
-		packages []string
-	}
-	var intermediate []iRow
+	var intermediate []scanTableRow
 
 	for _, name := range t.providerNames {
 		s := t.states[name]
 		if s.result == nil {
-			intermediate = append(intermediate, iRow{s.display, "⏭ unavailable", "-", nil})
+			intermediate = append(intermediate, scanTableRow{s.display, "⏭ unavailable", "-", nil})
 			continue
 		}
 
@@ -282,15 +277,14 @@ func (t *LiveScanTable) renderFinal() {
 			pkgNames = append(pkgNames, item.Name)
 		}
 
-		if len(r.Groups) > 0 {
-			intermediate = append(intermediate, iRow{s.display, status, outdated, nil})
-			for _, sub := range GroupSubRows(r.Groups) {
-				intermediate = append(intermediate, iRow{
-					sub.Label, status, fmt.Sprintf("%d", sub.Count), sub.PkgNames,
-				})
-			}
+		if knownGroups := t.subGroups[name]; len(knownGroups) > 0 {
+			intermediate = append(intermediate, scanTableRow{s.display, status, outdated, nil})
+			intermediate = append(intermediate, t.allSubGroupRows(name, r.Groups, status)...)
+		} else if len(r.Groups) > 0 {
+			intermediate = append(intermediate, scanTableRow{s.display, status, outdated, nil})
+			intermediate = append(intermediate, t.allSubGroupRows(name, r.Groups, status)...)
 		} else {
-			intermediate = append(intermediate, iRow{s.display, status, outdated, pkgNames})
+			intermediate = append(intermediate, scanTableRow{s.display, status, outdated, pkgNames})
 		}
 	}
 
@@ -363,12 +357,27 @@ func (t *LiveScanTable) buildSummaryRows() []ScanSummaryRow {
 		for _, item := range r.Outdated {
 			pkgs = append(pkgs, item.Name)
 		}
+
+		// Merge known sub-groups with scan result groups so all sub-groups
+		// appear in the summary (even those with 0 outdated packages).
+		groups := r.Groups
+		if known := t.subGroups[name]; len(known) > 0 {
+			merged := make(map[string][]string, len(known))
+			for _, g := range known {
+				merged[g] = nil // default: no outdated packages
+			}
+			for g, p := range r.Groups {
+				merged[g] = p
+			}
+			groups = merged
+		}
+
 		rows = append(rows, ScanSummaryRow{
 			ProviderName:  name,
 			DisplayName:   s.display,
 			OutdatedCount: len(r.Outdated),
 			Packages:      pkgs,
-			PackageGroups: r.Groups,
+			PackageGroups: groups,
 			Available:     r.Available,
 			Error:         r.Error,
 		})
@@ -379,4 +388,35 @@ func (t *LiveScanTable) buildSummaryRows() []ScanSummaryRow {
 // IsActive returns true if the LiveScanTable is using an AreaPrinter (TTY mode).
 func (t *LiveScanTable) IsActive() bool {
 	return t.area != nil
+}
+
+// allSubGroupRows builds sub-group rows using t.subGroups as the authoritative
+// list of labels, merging in actual data from groups (scan result). Sub-groups
+// not present in groups are shown with 0 outdated and no packages.
+func (t *LiveScanTable) allSubGroupRows(providerName string, groups map[string][]string, status string) []scanTableRow {
+	known := t.subGroups[providerName]
+	if len(known) == 0 {
+		// Fall back to whatever groups the scan returned.
+		var rows []scanTableRow
+		for _, sub := range GroupSubRows(groups) {
+			rows = append(rows, scanTableRow{sub.Label, status, fmt.Sprintf("%d", sub.Count), sub.PkgNames})
+		}
+		return rows
+	}
+
+	var rows []scanTableRow
+	for i, g := range known {
+		prefix := "  ├ "
+		if i == len(known)-1 {
+			prefix = "  └ "
+		}
+		label := prefix + g
+
+		if pkgs, ok := groups[g]; ok && len(pkgs) > 0 {
+			rows = append(rows, scanTableRow{label, status, fmt.Sprintf("%d", len(pkgs)), pkgs})
+		} else {
+			rows = append(rows, scanTableRow{label, status, "0", nil})
+		}
+	}
+	return rows
 }

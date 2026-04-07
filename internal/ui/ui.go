@@ -314,6 +314,7 @@ type GroupSubRow struct {
 
 // GroupSubRows expands a Groups map into sorted sub-rows for table rendering.
 // Each group becomes a row with a tree-style prefix (├ for intermediate, └ for last).
+// Groups with no packages are included with count 0.
 func GroupSubRows(groups map[string][]string) []GroupSubRow {
 	if len(groups) == 0 {
 		return nil
@@ -325,18 +326,10 @@ func GroupSubRows(groups map[string][]string) []GroupSubRow {
 	}
 	sort.Strings(keys)
 
-	// Filter out empty groups first so we know which is last.
-	var nonEmpty []string
-	for _, k := range keys {
-		if len(groups[k]) > 0 {
-			nonEmpty = append(nonEmpty, k)
-		}
-	}
-
-	rows := make([]GroupSubRow, 0, len(nonEmpty))
-	for i, k := range nonEmpty {
+	rows := make([]GroupSubRow, 0, len(keys))
+	for i, k := range keys {
 		prefix := "  ├ "
-		if i == len(nonEmpty)-1 {
+		if i == len(keys)-1 {
 			prefix = "  └ "
 		}
 		rows = append(rows, GroupSubRow{
