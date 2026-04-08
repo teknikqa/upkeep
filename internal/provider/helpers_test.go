@@ -255,3 +255,56 @@ func TestRunCommandVerbose_NilExtraWriter(t *testing.T) {
 		t.Errorf("expected stdout to contain 'no-extra-writer', got %q", out)
 	}
 }
+
+// --- ProgressFunc context helpers ---
+
+func TestContextWithProgress_RoundTrip(t *testing.T) {
+	var received []provider.PackageProgress
+	fn := func(p provider.PackageProgress) {
+		received = append(received, p)
+	}
+
+	ctx := provider.ContextWithProgress(context.Background(), fn)
+	got := provider.ProgressFromContext(ctx)
+	if got == nil {
+		t.Fatal("expected ProgressFunc from context, got nil")
+	}
+
+	got(provider.PackageProgress{Name: "pkg1", Status: provider.PackageUpdated})
+	if len(received) != 1 || received[0].Name != "pkg1" {
+		t.Errorf("expected 1 progress event for pkg1, got %+v", received)
+	}
+}
+
+func TestProgressFromContext_EmptyContext(t *testing.T) {
+	got := provider.ProgressFromContext(context.Background())
+	if got != nil {
+		t.Error("expected nil ProgressFunc from empty context")
+	}
+}
+
+func TestReportProgress_WithFunc(t *testing.T) {
+	var received []provider.PackageProgress
+	fn := func(p provider.PackageProgress) {
+		received = append(received, p)
+	}
+	ctx := provider.ContextWithProgress(context.Background(), fn)
+
+	provider.ReportProgress(ctx, "pkg-a", provider.PackageUpdated)
+	provider.ReportProgress(ctx, "pkg-b", provider.PackageFailed)
+
+	if len(received) != 2 {
+		t.Fatalf("expected 2 progress events, got %d", len(received))
+	}
+	if received[0].Status != provider.PackageUpdated {
+		t.Errorf("expected PackageUpdated, got %s", received[0].Status)
+	}
+	if received[1].Status != provider.PackageFailed {
+		t.Errorf("expected PackageFailed, got %s", received[1].Status)
+	}
+}
+
+func TestReportProgress_WithoutFunc(t *testing.T) {
+	// Should not panic when no ProgressFunc is set.
+	provider.ReportProgress(context.Background(), "pkg", provider.PackageUpdated)
+}

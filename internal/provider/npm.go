@@ -70,8 +70,10 @@ func (p *NpmProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 		if err != nil {
 			p.logf("npm install -g %s@latest error: %v\n%s", item.Name, err, out)
 			failed = append(failed, item.Name)
+			ReportProgress(ctx, item.Name, PackageFailed)
 		} else {
 			updated = append(updated, item.Name)
+			ReportProgress(ctx, item.Name, PackageUpdated)
 		}
 	}
 

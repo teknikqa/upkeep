@@ -98,8 +98,10 @@ func (p *VagrantProvider) Update(ctx context.Context, items []OutdatedItem) Upda
 	if err != nil {
 		p.logf("vagrant plugin update error: %v\n%s", err, out)
 		failed = append(failed, "vagrant-plugins")
+		ReportProgress(ctx, "vagrant-plugins", PackageFailed)
 	} else {
 		updated = append(updated, "vagrant-plugins")
+		ReportProgress(ctx, "vagrant-plugins", PackageUpdated)
 	}
 
 	return UpdateResult{

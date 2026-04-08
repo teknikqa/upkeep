@@ -60,8 +60,10 @@ func (p *RustProvider) Update(ctx context.Context, items []OutdatedItem) UpdateR
 		if err != nil {
 			p.logf("rustup update error: %v\n%s", err, out)
 			failed = append(failed, "rustup-toolchains")
+			ReportProgress(ctx, "rustup-toolchains", PackageFailed)
 		} else {
 			updated = append(updated, "rustup-toolchains")
+			ReportProgress(ctx, "rustup-toolchains", PackageUpdated)
 		}
 	}
 
@@ -70,8 +72,10 @@ func (p *RustProvider) Update(ctx context.Context, items []OutdatedItem) UpdateR
 		if err != nil {
 			p.logf("cargo install-update error: %v\n%s", err, out)
 			failed = append(failed, "cargo-binaries")
+			ReportProgress(ctx, "cargo-binaries", PackageFailed)
 		} else {
 			updated = append(updated, "cargo-binaries")
+			ReportProgress(ctx, "cargo-binaries", PackageUpdated)
 		}
 	}
 

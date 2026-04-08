@@ -122,8 +122,10 @@ func (p *VimProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 			if err := downloadFile(ctx, pathogenURL, dest); err != nil {
 				p.logf("downloading pathogen: %v", err)
 				failed = append(failed, "pathogen.vim")
+				ReportProgress(ctx, "pathogen.vim", PackageFailed)
 			} else {
 				updated = append(updated, "pathogen.vim")
+				ReportProgress(ctx, "pathogen.vim", PackageUpdated)
 			}
 		}
 	}
@@ -145,8 +147,10 @@ func (p *VimProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 				if err != nil {
 					p.logf("git pull %s error: %v\n%s", e.Name(), err, out)
 					failed = append(failed, e.Name())
+					ReportProgress(ctx, e.Name(), PackageFailed)
 				} else {
 					updated = append(updated, e.Name())
+					ReportProgress(ctx, e.Name(), PackageUpdated)
 				}
 			}
 		}

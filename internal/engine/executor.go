@@ -21,6 +21,9 @@ type ExecuteOptions struct {
 	OnStart func(name string)
 	// OnComplete is called after each provider finishes (for live table updates, etc.).
 	OnComplete func(name string, result provider.UpdateResult)
+	// OnProgress is called after each individual package completes within a provider.
+	// The provider name is prepended so the UI knows which provider the progress belongs to.
+	OnProgress func(providerName string, progress provider.PackageProgress)
 }
 
 // Execute runs all provided providers, respecting dependency ordering from
@@ -87,9 +90,19 @@ func Execute(ctx context.Context, providers []provider.Provider, scanResults map
 				opts.OnStart(p.Name())
 			}
 
+			// Inject per-package progress callback into context so providers
+			// can report incremental progress without changing the Provider interface.
+			updateCtx := ctx
+			if opts.OnProgress != nil {
+				pName := p.Name()
+				updateCtx = provider.ContextWithProgress(ctx, func(prog provider.PackageProgress) {
+					opts.OnProgress(pName, prog)
+				})
+			}
+
 			// Get the items to update from the scan results.
 			scanResult := scanResults[p.Name()]
-			result := p.Update(ctx, scanResult.Outdated)
+			result := p.Update(updateCtx, scanResult.Outdated)
 
 			// Wrap any update error in a ProviderError for structured handling.
 			if result.Error != nil {

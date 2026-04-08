@@ -88,8 +88,14 @@ func (p *BrewProvider) Update(ctx context.Context, items []OutdatedItem) UpdateR
 	if err != nil {
 		p.logf("brew upgrade error: %v\n%s", err, output)
 		failed = names
+		for _, n := range names {
+			ReportProgress(ctx, n, PackageFailed)
+		}
 	} else {
 		updated = names
+		for _, n := range names {
+			ReportProgress(ctx, n, PackageUpdated)
+		}
 	}
 
 	// Run post-hooks from config.

@@ -65,12 +65,18 @@ func (p *ComposerProvider) Update(ctx context.Context, items []OutdatedItem) Upd
 	out, err := RunCommandWithLog(ctx, p.logger, "composer", "global", "update")
 	if err != nil {
 		p.logf("composer global update error: %v\n%s", err, out)
+		for _, n := range names {
+			ReportProgress(ctx, n, PackageFailed)
+		}
 		return UpdateResult{
 			Failed:   names,
 			Duration: time.Since(start),
 		}
 	}
 
+	for _, n := range names {
+		ReportProgress(ctx, n, PackageUpdated)
+	}
 	return UpdateResult{
 		Updated:  names,
 		Duration: time.Since(start),

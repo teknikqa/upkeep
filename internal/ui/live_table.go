@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +23,8 @@ type providerUpdateState struct {
 	skippedCount  int
 	failedCount   int
 	duration      time.Duration
+	startTime     time.Time // set when status becomes "updating"
+	currentPkg    string    // package currently being processed (for footer)
 }
 
 // LiveUpdateTable renders the scan summary table as a live-updating view during
@@ -35,6 +38,8 @@ type LiveUpdateTable struct {
 	writer        io.Writer          // for non-TTY fallback output
 	stopped       bool
 	totalDuration time.Duration
+	tickerStop    chan struct{} // signals the duration ticker to stop
+	tickerDone    chan struct{} // closed when the ticker goroutine exits
 }
 
 // NewLiveUpdateTable creates a LiveUpdateTable from the scan summary rows.
@@ -59,9 +64,11 @@ func NewLiveUpdateTable(rows []ScanSummaryRow, scanTableLines int, w io.Writer) 
 	}
 
 	t := &LiveUpdateTable{
-		rows:   rows,
-		states: states,
-		writer: w,
+		rows:       rows,
+		states:     states,
+		writer:     w,
+		tickerStop: make(chan struct{}),
+		tickerDone: make(chan struct{}),
 	}
 
 	if IsTTY() {
@@ -78,10 +85,36 @@ func NewLiveUpdateTable(rows []ScanSummaryRow, scanTableLines int, w io.Writer) 
 		if err == nil {
 			t.area = area
 			t.render()
+			// Start the duration ticker to update elapsed times every 100ms.
+			go t.runTicker()
+		} else {
+			close(t.tickerDone)
 		}
+	} else {
+		close(t.tickerDone)
 	}
 
 	return t
+}
+
+// runTicker periodically re-renders the table to update live durations.
+// Runs in its own goroutine; stopped by closing t.tickerStop.
+func (t *LiveUpdateTable) runTicker() {
+	defer close(t.tickerDone)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-t.tickerStop:
+			return
+		case <-ticker.C:
+			t.mu.Lock()
+			if !t.stopped {
+				t.render()
+			}
+			t.mu.Unlock()
+		}
+	}
 }
 
 // OnProviderStart marks a provider as currently updating and refreshes the table.
@@ -92,8 +125,51 @@ func (t *LiveUpdateTable) OnProviderStart(name string) {
 
 	if s, ok := t.states[name]; ok {
 		s.status = "updating"
+		s.startTime = time.Now()
 	}
 	t.render()
+}
+
+// OnPackageProgress records incremental progress for a single package within a
+// provider and refreshes the table. Called from executor goroutines — thread-safe.
+func (t *LiveUpdateTable) OnPackageProgress(providerName string, progress provider.PackageProgress) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	s, ok := t.states[providerName]
+	if !ok {
+		return
+	}
+
+	switch progress.Status {
+	case provider.PackageUpdated:
+		s.updatedCount++
+	case provider.PackageFailed:
+		s.failedCount++
+	case provider.PackageDeferred:
+		s.deferredCount++
+	case provider.PackageSkipped:
+		s.skippedCount++
+	}
+
+	// Clear the current package indicator since this one just finished.
+	s.currentPkg = ""
+
+	if IsTTY() {
+		t.render()
+	}
+}
+
+// OnPackageStart records which package is about to be processed for the footer.
+// Called from executor goroutines — thread-safe.
+func (t *LiveUpdateTable) OnPackageStart(providerName string, pkgName string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if s, ok := t.states[providerName]; ok {
+		s.currentPkg = pkgName
+	}
+	// No render here — the ticker will pick it up.
 }
 
 // OnProviderComplete records the final result for a provider and refreshes the table.
@@ -107,11 +183,13 @@ func (t *LiveUpdateTable) OnProviderComplete(name string, result provider.Update
 		return
 	}
 
+	// Use the final counts from the result (authoritative over incremental).
 	s.updatedCount = len(result.Updated)
 	s.deferredCount = len(result.Deferred)
 	s.skippedCount = len(result.Skipped)
 	s.failedCount = len(result.Failed)
 	s.duration = result.Duration
+	s.currentPkg = ""
 
 	switch {
 	case result.Error != nil && s.updatedCount == 0 && len(result.Deferred) == 0:
@@ -150,7 +228,15 @@ func (t *LiveUpdateTable) Stop() {
 	}
 	t.stopped = true
 
+	// Stop the ticker goroutine.
+	close(t.tickerStop)
+
 	if t.area != nil {
+		// Wait for ticker to fully exit before final render to avoid races.
+		t.mu.Unlock()
+		<-t.tickerDone
+		t.mu.Lock()
+
 		// Do a final render with all final states before stopping.
 		t.render()
 		if err := t.area.Stop(); err != nil {
@@ -276,18 +362,89 @@ func (t *LiveUpdateTable) render() {
 		sb.WriteString("\n")
 	}
 
+	// Append the active packages footer.
+	footer := t.activePackagesFooter(tw)
+	if footer != "" {
+		sb.WriteString(footer)
+	}
+
 	t.area.Update(strings.TrimRight(sb.String(), "\n"))
 }
 
+// activePackagesFooter builds a footer line showing which packages are currently
+// being updated. Returns empty string if nothing is actively updating.
+func (t *LiveUpdateTable) activePackagesFooter(maxWidth int) string {
+	// Collect active package names with their provider display name.
+	type activePkg struct {
+		providerDisplay string
+		pkgName         string
+	}
+	var active []activePkg
+
+	for _, r := range t.rows {
+		s := t.states[r.ProviderName]
+		if s == nil || s.status != "updating" {
+			continue
+		}
+		if s.currentPkg != "" {
+			active = append(active, activePkg{r.DisplayName, s.currentPkg})
+		} else {
+			// Provider is updating but no specific package — show provider name.
+			active = append(active, activePkg{r.DisplayName, ""})
+		}
+	}
+
+	if len(active) == 0 {
+		return ""
+	}
+
+	// Sort for stable output.
+	sort.Slice(active, func(i, j int) bool {
+		return active[i].providerDisplay < active[j].providerDisplay
+	})
+
+	// Build the footer.
+	var parts []string
+	for _, a := range active {
+		if a.pkgName != "" {
+			parts = append(parts, fmt.Sprintf("%s → %s", a.providerDisplay, a.pkgName))
+		} else {
+			parts = append(parts, a.providerDisplay)
+		}
+	}
+
+	line := "⏳ Updating: " + strings.Join(parts, ", ")
+
+	// Truncate if too wide.
+	if maxWidth > 0 && len(line) > maxWidth {
+		if maxWidth > 4 {
+			line = line[:maxWidth-3] + "..."
+		} else {
+			line = line[:maxWidth]
+		}
+	}
+
+	return "\n" + line
+}
+
 // reportColumns returns the 5 report column strings for a provider state.
-// Returns "—" for pending/updating providers and actual values for completed ones.
+// For "updating" providers, shows live incremental values and elapsed time.
+// Returns "—" for pending/unavailable providers and actual values for completed ones.
 func (t *LiveUpdateTable) reportColumns(s *providerUpdateState) (upd, def, skip, fail, dur string) {
 	if s == nil {
 		return "—", "—", "—", "—", "—"
 	}
 	switch s.status {
-	case "pending", "updating", "unavailable":
+	case "pending", "unavailable":
 		return "—", "—", "—", "—", "—"
+	case "updating":
+		// Show live incremental counts and elapsed time.
+		elapsed := time.Since(s.startTime).Round(100 * time.Millisecond)
+		return fmt.Sprintf("%d", s.updatedCount),
+			fmt.Sprintf("%d", s.deferredCount),
+			fmt.Sprintf("%d", s.skippedCount),
+			fmt.Sprintf("%d", s.failedCount),
+			elapsed.String()
 	default: // "success", "partial", "failed"
 		return fmt.Sprintf("%d", s.updatedCount),
 			fmt.Sprintf("%d", s.deferredCount),
@@ -309,7 +466,12 @@ func (t *LiveUpdateTable) rowStatusAndOutdated(r ScanSummaryRow, s *providerUpda
 	switch s.status {
 	case "updating":
 		status = "🔄 updating"
-		outdated = fmt.Sprintf("%d", r.OutdatedCount)
+		// Show decremented outdated count based on incremental progress.
+		remaining := r.OutdatedCount - s.updatedCount - s.failedCount - s.deferredCount - s.skippedCount
+		if remaining < 0 {
+			remaining = 0
+		}
+		outdated = fmt.Sprintf("%d", remaining)
 	case "success":
 		status = "✅ success"
 		remaining := r.OutdatedCount - s.updatedCount - s.failedCount

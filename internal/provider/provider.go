@@ -7,6 +7,52 @@ import (
 	"time"
 )
 
+// PackageStatus represents the outcome of a single package update.
+type PackageStatus string
+
+const (
+	// PackageUpdated means the package was successfully updated.
+	PackageUpdated PackageStatus = "updated"
+	// PackageFailed means the package update failed.
+	PackageFailed PackageStatus = "failed"
+	// PackageDeferred means the package was deferred (e.g., auth-required).
+	PackageDeferred PackageStatus = "deferred"
+	// PackageSkipped means the package was skipped (e.g., config skip-list).
+	PackageSkipped PackageStatus = "skipped"
+)
+
+// PackageProgress reports the completion of a single package within a provider.
+type PackageProgress struct {
+	Name   string        // package name
+	Status PackageStatus // outcome
+}
+
+// ProgressFunc is called by providers after each individual package completes.
+// Providers retrieve it from context via ProgressFromContext.
+type ProgressFunc func(progress PackageProgress)
+
+// progressKey is the context key for ProgressFunc.
+type progressKey struct{}
+
+// ContextWithProgress returns a new context carrying the given ProgressFunc.
+func ContextWithProgress(ctx context.Context, fn ProgressFunc) context.Context {
+	return context.WithValue(ctx, progressKey{}, fn)
+}
+
+// ProgressFromContext retrieves the ProgressFunc from ctx, or nil if not set.
+func ProgressFromContext(ctx context.Context) ProgressFunc {
+	fn, _ := ctx.Value(progressKey{}).(ProgressFunc)
+	return fn
+}
+
+// ReportProgress is a convenience helper that calls the ProgressFunc from ctx
+// if one is set. Safe to call when ctx has no ProgressFunc.
+func ReportProgress(ctx context.Context, name string, status PackageStatus) {
+	if fn := ProgressFromContext(ctx); fn != nil {
+		fn(PackageProgress{Name: name, Status: status})
+	}
+}
+
 // ErrDependencyNotMet is returned when a provider's dependency was not satisfied.
 var ErrDependencyNotMet = errors.New("provider dependency not met")
 

@@ -77,8 +77,10 @@ func (p *PipProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 			if err != nil {
 				p.logf("pip3 upgrade pip error: %v\n%s", err, out)
 				failed = append(failed, "pip")
+				ReportProgress(ctx, "pip", PackageFailed)
 			} else {
 				updated = append(updated, "pip")
+				ReportProgress(ctx, "pip", PackageUpdated)
 			}
 		}
 		if p.cfg.UpgradeSetuptools {
@@ -86,8 +88,10 @@ func (p *PipProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 			if err != nil {
 				p.logf("pip3 upgrade setuptools error: %v\n%s", err, out)
 				failed = append(failed, "setuptools")
+				ReportProgress(ctx, "setuptools", PackageFailed)
 			} else {
 				updated = append(updated, "setuptools", "wheel", "virtualenv")
+				ReportProgress(ctx, "setuptools", PackageUpdated)
 			}
 		}
 		// Upgrade each outdated package (skip the pipx pseudo-item).
@@ -99,8 +103,10 @@ func (p *PipProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 			if err != nil {
 				p.logf("pip3 upgrade %s error: %v\n%s", item.Name, err, out)
 				failed = append(failed, item.Name)
+				ReportProgress(ctx, item.Name, PackageFailed)
 			} else {
 				updated = append(updated, item.Name)
+				ReportProgress(ctx, item.Name, PackageUpdated)
 			}
 		}
 	}
@@ -110,8 +116,10 @@ func (p *PipProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 		if err != nil {
 			p.logf("pipx upgrade-all error: %v\n%s", err, out)
 			failed = append(failed, "pipx-packages")
+			ReportProgress(ctx, "pipx-packages", PackageFailed)
 		} else {
 			updated = append(updated, "pipx-packages")
+			ReportProgress(ctx, "pipx-packages", PackageUpdated)
 		}
 	}
 

@@ -275,3 +275,119 @@ func TestLiveUpdateTable_NonTTY_Skipped(t *testing.T) {
 		t.Errorf("expected 'skipped=2' in output, got: %q", out)
 	}
 }
+
+// TestLiveUpdateTable_OnPackageProgress_IncrementsCounts verifies that
+// OnPackageProgress increments the correct counters based on PackageStatus.
+func TestLiveUpdateTable_OnPackageProgress_IncrementsCounts(t *testing.T) {
+	var buf bytes.Buffer
+	rows := []ui.ScanSummaryRow{
+		{ProviderName: "npm", DisplayName: "npm", OutdatedCount: 4, Packages: []string{"a", "b", "c", "d"}, Available: true},
+	}
+	lt := ui.NewLiveUpdateTable(rows, 0, &buf)
+
+	lt.OnProviderStart("npm")
+
+	// Simulate incremental per-package progress.
+	lt.OnPackageProgress("npm", provider.PackageProgress{Name: "a", Status: provider.PackageUpdated})
+	lt.OnPackageProgress("npm", provider.PackageProgress{Name: "b", Status: provider.PackageFailed})
+	lt.OnPackageProgress("npm", provider.PackageProgress{Name: "c", Status: provider.PackageDeferred})
+	lt.OnPackageProgress("npm", provider.PackageProgress{Name: "d", Status: provider.PackageSkipped})
+
+	// Final OnComplete should use authoritative counts.
+	lt.OnProviderComplete("npm", provider.UpdateResult{
+		Updated:  []string{"a"},
+		Failed:   []string{"b"},
+		Deferred: []string{"c"},
+		Skipped:  []string{"d"},
+		Duration: time.Second,
+	})
+	lt.Stop()
+
+	out := buf.String()
+	if !strings.Contains(out, "updated=1") {
+		t.Errorf("expected 'updated=1' in output, got: %q", out)
+	}
+	if !strings.Contains(out, "failed=1") {
+		t.Errorf("expected 'failed=1' in output, got: %q", out)
+	}
+	if !strings.Contains(out, "deferred=1") {
+		t.Errorf("expected 'deferred=1' in output, got: %q", out)
+	}
+	if !strings.Contains(out, "skipped=1") {
+		t.Errorf("expected 'skipped=1' in output, got: %q", out)
+	}
+}
+
+// TestLiveUpdateTable_OnPackageProgress_UnknownProvider verifies that
+// OnPackageProgress for an unknown provider doesn't panic.
+func TestLiveUpdateTable_OnPackageProgress_UnknownProvider(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("unexpected panic: %v", r)
+		}
+	}()
+
+	var buf bytes.Buffer
+	lt := ui.NewLiveUpdateTable(testScanRows(), 0, &buf)
+	lt.OnPackageProgress("nonexistent", provider.PackageProgress{Name: "pkg", Status: provider.PackageUpdated})
+	lt.Stop()
+}
+
+// TestLiveUpdateTable_ConcurrentAccess_WithProgress verifies no data races when
+// multiple goroutines call OnProviderStart, OnPackageProgress, and OnProviderComplete.
+// Run with `go test -race` to detect races.
+func TestLiveUpdateTable_ConcurrentAccess_WithProgress(t *testing.T) {
+	var buf bytes.Buffer
+	rows := []ui.ScanSummaryRow{
+		{ProviderName: "a", DisplayName: "A", OutdatedCount: 3, Packages: []string{"p1", "p2", "p3"}, Available: true},
+		{ProviderName: "b", DisplayName: "B", OutdatedCount: 2, Packages: []string{"p4", "p5"}, Available: true},
+	}
+	lt := ui.NewLiveUpdateTable(rows, 0, &buf)
+
+	var wg sync.WaitGroup
+	for _, name := range []string{"a", "b"} {
+		name := name
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			lt.OnProviderStart(name)
+			// Simulate per-package progress.
+			lt.OnPackageProgress(name, provider.PackageProgress{Name: "pkg1", Status: provider.PackageUpdated})
+			lt.OnPackageProgress(name, provider.PackageProgress{Name: "pkg2", Status: provider.PackageFailed})
+			lt.OnProviderComplete(name, provider.UpdateResult{
+				Updated:  []string{"pkg1"},
+				Failed:   []string{"pkg2"},
+				Duration: 10 * time.Millisecond,
+			})
+		}()
+	}
+	wg.Wait()
+	lt.Stop()
+}
+
+// TestLiveUpdateTable_OnPackageStart_SetsCurrentPkg verifies that
+// OnPackageStart records the current package being processed.
+func TestLiveUpdateTable_OnPackageStart_SetsCurrentPkg(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("unexpected panic: %v", r)
+		}
+	}()
+
+	var buf bytes.Buffer
+	rows := []ui.ScanSummaryRow{
+		{ProviderName: "brew", DisplayName: "Homebrew", OutdatedCount: 1, Packages: []string{"git"}, Available: true},
+	}
+	lt := ui.NewLiveUpdateTable(rows, 0, &buf)
+
+	lt.OnProviderStart("brew")
+	lt.OnPackageStart("brew", "git")
+	// OnPackageStart for unknown provider should be safe.
+	lt.OnPackageStart("nonexistent", "pkg")
+
+	lt.OnProviderComplete("brew", provider.UpdateResult{
+		Updated:  []string{"git"},
+		Duration: time.Second,
+	})
+	lt.Stop()
+}

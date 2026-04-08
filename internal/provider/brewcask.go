@@ -114,8 +114,10 @@ func (p *BrewCaskProvider) Update(ctx context.Context, items []OutdatedItem) Upd
 		if err != nil {
 			p.logf("brew upgrade --cask %s error: %v\n%s", item.Name, err, out)
 			failed = append(failed, item.Name)
+			ReportProgress(ctx, item.Name, PackageFailed)
 		} else {
 			updated = append(updated, item.Name)
+			ReportProgress(ctx, item.Name, PackageUpdated)
 		}
 	}
 
@@ -127,17 +129,21 @@ func (p *BrewCaskProvider) Update(ctx context.Context, items []OutdatedItem) Upd
 			if err != nil {
 				p.logf("brew upgrade --cask %s (interactive) error: %v\n%s", item.Name, err, out)
 				failed = append(failed, item.Name)
+				ReportProgress(ctx, item.Name, PackageFailed)
 			} else {
 				updated = append(updated, item.Name)
+				ReportProgress(ctx, item.Name, PackageUpdated)
 			}
 		}
 	case "skip":
 		for _, item := range authReq {
 			skipped = append(skipped, item.Name)
+			ReportProgress(ctx, item.Name, PackageSkipped)
 		}
 	default: // "defer"
 		for _, item := range authReq {
 			deferred = append(deferred, item.Name)
+			ReportProgress(ctx, item.Name, PackageDeferred)
 		}
 		if len(deferred) > 0 {
 			if err := p.writeDeferredScript(deferred); err != nil {

@@ -177,6 +177,9 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 		OnComplete: func(name string, result provider.UpdateResult) {
 			liveTable.OnProviderComplete(name, result)
 		},
+		OnProgress: func(providerName string, progress provider.PackageProgress) {
+			liveTable.OnPackageProgress(providerName, progress)
+		},
 	})
 
 	totalDuration := time.Since(runStart)

@@ -156,8 +156,10 @@ func (p *EditorProvider) Update(ctx context.Context, _ []OutdatedItem) UpdateRes
 				p.logf("%s --update-extensions error: %v\n%s", editor, err, out)
 			}
 			failed = append(failed, editor)
+			ReportProgress(ctx, editor, PackageFailed)
 		} else {
 			updated = append(updated, editor)
+			ReportProgress(ctx, editor, PackageUpdated)
 		}
 	}
 
