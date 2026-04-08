@@ -3,6 +3,9 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/teknikqa/upkeep/internal/config"
@@ -20,6 +23,10 @@ type pipOutdatedPackage struct {
 type PipProvider struct {
 	cfg    config.PipConfig
 	logger *logging.Logger
+
+	// checkExternallyManaged overrides the default PEP 668 detection for testing.
+	// When nil, the real isExternallyManaged function is used.
+	checkExternallyManaged func(ctx context.Context) bool
 }
 
 // NewPipProvider creates a new pip provider.
@@ -41,6 +48,7 @@ func (p *PipProvider) Scan(ctx context.Context) ScanResult {
 	}
 
 	var items []OutdatedItem
+	var message string
 
 	if pip3Exists {
 		stdout, _, err := RunCommand(ctx, "pip3", "list", "--outdated", "--format=json")
@@ -52,6 +60,9 @@ func (p *PipProvider) Scan(ctx context.Context) ScanResult {
 				items = append(items, parsed...)
 			}
 		}
+		if p.isExternallyManagedEnv(ctx) {
+			message = "pip3: externally-managed environment (PEP 668) — pip3 packages will be skipped"
+		}
 	}
 
 	// Indicate pipx is available as a pseudo-item (no per-package scan needed).
@@ -62,41 +73,61 @@ func (p *PipProvider) Scan(ctx context.Context) ScanResult {
 		})
 	}
 
-	return ScanResult{Available: true, Outdated: items}
+	return ScanResult{Available: true, Outdated: items, Message: message}
 }
 
 // Update upgrades pip packages and/or runs pipx upgrade-all.
 func (p *PipProvider) Update(ctx context.Context, items []OutdatedItem) UpdateResult {
 	start := time.Now()
-	var updated, failed []string
+	var updated, failed, skipped []string
 
 	if CommandExists("pip3") {
+		extManaged := p.isExternallyManagedEnv(ctx)
+		if extManaged {
+			p.logf("skipping pip3 upgrades: externally-managed environment (PEP 668)")
+		}
+
 		// Upgrade pip itself and common tooling.
 		if p.cfg.UpgradePip {
-			out, err := RunCommandWithLog(ctx, p.logger, "pip3", "install", "--upgrade", "pip")
-			if err != nil {
-				p.logf("pip3 upgrade pip error: %v\n%s", err, out)
-				failed = append(failed, "pip")
-				ReportProgress(ctx, "pip", PackageFailed)
+			if extManaged {
+				skipped = append(skipped, "pip")
+				ReportProgress(ctx, "pip", PackageSkipped)
 			} else {
-				updated = append(updated, "pip")
-				ReportProgress(ctx, "pip", PackageUpdated)
+				out, err := RunCommandWithLog(ctx, p.logger, "pip3", "install", "--upgrade", "pip")
+				if err != nil {
+					p.logf("pip3 upgrade pip error: %v\n%s", err, out)
+					failed = append(failed, "pip")
+					ReportProgress(ctx, "pip", PackageFailed)
+				} else {
+					updated = append(updated, "pip")
+					ReportProgress(ctx, "pip", PackageUpdated)
+				}
 			}
 		}
 		if p.cfg.UpgradeSetuptools {
-			out, err := RunCommandWithLog(ctx, p.logger, "pip3", "install", "--upgrade", "setuptools", "wheel", "virtualenv")
-			if err != nil {
-				p.logf("pip3 upgrade setuptools error: %v\n%s", err, out)
-				failed = append(failed, "setuptools")
-				ReportProgress(ctx, "setuptools", PackageFailed)
+			if extManaged {
+				skipped = append(skipped, "setuptools", "wheel", "virtualenv")
+				ReportProgress(ctx, "setuptools", PackageSkipped)
 			} else {
-				updated = append(updated, "setuptools", "wheel", "virtualenv")
-				ReportProgress(ctx, "setuptools", PackageUpdated)
+				out, err := RunCommandWithLog(ctx, p.logger, "pip3", "install", "--upgrade", "setuptools", "wheel", "virtualenv")
+				if err != nil {
+					p.logf("pip3 upgrade setuptools error: %v\n%s", err, out)
+					failed = append(failed, "setuptools")
+					ReportProgress(ctx, "setuptools", PackageFailed)
+				} else {
+					updated = append(updated, "setuptools", "wheel", "virtualenv")
+					ReportProgress(ctx, "setuptools", PackageUpdated)
+				}
 			}
 		}
 		// Upgrade each outdated package (skip the pipx pseudo-item).
 		for _, item := range items {
 			if item.Name == "pipx (all packages)" {
+				continue
+			}
+			if extManaged {
+				skipped = append(skipped, item.Name)
+				ReportProgress(ctx, item.Name, PackageSkipped)
 				continue
 			}
 			out, err := RunCommandWithLog(ctx, p.logger, "pip3", "install", "--upgrade", item.Name)
@@ -126,6 +157,7 @@ func (p *PipProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 	return UpdateResult{
 		Updated:  updated,
 		Failed:   failed,
+		Skipped:  skipped,
 		Duration: time.Since(start),
 	}
 }
@@ -145,6 +177,33 @@ func parsePipOutdated(jsonStr string) ([]OutdatedItem, error) {
 		})
 	}
 	return items, nil
+}
+
+// isExternallyManaged returns true if the system Python is marked as
+// externally-managed per PEP 668 (e.g. Homebrew Python on macOS).
+// It queries python3 for the stdlib path and checks for the EXTERNALLY-MANAGED
+// marker file.
+func isExternallyManaged(ctx context.Context) bool {
+	stdout, _, err := RunCommand(ctx, "python3", "-c", "import sysconfig; print(sysconfig.get_path('stdlib'))")
+	if err != nil {
+		return false
+	}
+	stdlibPath := strings.TrimSpace(stdout)
+	if stdlibPath == "" {
+		return false
+	}
+	markerPath := filepath.Join(stdlibPath, "EXTERNALLY-MANAGED")
+	_, err = os.Stat(markerPath)
+	return err == nil
+}
+
+// isExternallyManagedEnv calls the provider's override if set, otherwise the
+// real detection function.
+func (p *PipProvider) isExternallyManagedEnv(ctx context.Context) bool {
+	if p.checkExternallyManaged != nil {
+		return p.checkExternallyManaged(ctx)
+	}
+	return isExternallyManaged(ctx)
 }
 
 func (p *PipProvider) logf(format string, args ...any) {

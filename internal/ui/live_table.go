@@ -474,14 +474,14 @@ func (t *LiveUpdateTable) rowStatusAndOutdated(r ScanSummaryRow, s *providerUpda
 		outdated = fmt.Sprintf("%d", remaining)
 	case "success":
 		status = "✅ success"
-		remaining := r.OutdatedCount - s.updatedCount - s.failedCount
+		remaining := r.OutdatedCount - s.updatedCount - s.failedCount - s.skippedCount
 		if remaining < 0 {
 			remaining = 0
 		}
 		outdated = fmt.Sprintf("%d", remaining)
 	case "partial":
 		status = "📬 partial"
-		remaining := r.OutdatedCount - s.updatedCount - s.failedCount
+		remaining := r.OutdatedCount - s.updatedCount - s.failedCount - s.skippedCount
 		if remaining < 0 {
 			remaining = 0
 		}

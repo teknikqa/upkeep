@@ -75,6 +75,16 @@ func ParsePipOutdated(jsonStr string) ([]OutdatedItem, error) {
 	return parsePipOutdated(jsonStr)
 }
 
+// IsExternallyManaged exposes isExternallyManaged for testing.
+func IsExternallyManaged(ctx context.Context) bool {
+	return isExternallyManaged(ctx)
+}
+
+// SetCheckExternallyManaged sets the PEP 668 detection override on a PipProvider for testing.
+func (p *PipProvider) SetCheckExternallyManaged(fn func(ctx context.Context) bool) {
+	p.checkExternallyManaged = fn
+}
+
 // ParseRustupCheck exposes parseRustupCheck for testing.
 func ParseRustupCheck(output string) []OutdatedItem {
 	return parseRustupCheck(output)
