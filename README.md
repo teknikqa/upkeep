@@ -40,7 +40,7 @@ sudo mv upkeep /usr/local/bin/
 
 ### From source
 
-Requires Go 1.24+.
+Requires Go 1.25+.
 
 ```bash
 # Install with go install

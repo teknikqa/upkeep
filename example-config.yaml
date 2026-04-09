@@ -1,0 +1,83 @@
+# upkeep example configuration
+#
+# Default location: ~/.config/upkeep/config.yaml
+# Auto-created with these defaults on first run.
+# Edit interactively with: upkeep config edit
+
+# Maximum number of providers updating concurrently (1–32).
+parallelism: 4
+
+providers:
+  brew:
+    enabled: true
+    skip: []                # package names to skip (e.g. ["go", "node"])
+    post_hooks:             # shell commands run after brew upgrade
+      - "brew doctor --quiet"
+      - "brew autoremove --quiet"
+      - "brew cleanup --quiet"
+
+  brew-cask:
+    enabled: true
+    greedy: true            # include auto-updating casks in outdated check
+    skip: []
+    auth_strategy: defer    # defer | skip | force-interactive
+    auth_overrides:         # per-cask overrides (true = always auth, false = never)
+      {}
+      # docker: false
+      # virtualbox: true
+    rebuild_open_with: true # rebuild macOS "Open With" menu after cask updates
+
+  npm:
+    enabled: true
+    skip: []
+
+  composer:
+    enabled: true
+
+  pip:
+    enabled: true
+    upgrade_pip: true       # upgrade pip itself
+    upgrade_setuptools: true # upgrade setuptools, wheel, virtualenv
+    pipx: true              # run pipx upgrade-all
+
+  rust:
+    enabled: true
+    rustup: true            # run rustup update
+    cargo_install_update: true # run cargo install-update -a
+
+  editor:
+    enabled: true
+    editors:                # CLI names of editors to update extensions for
+      - code
+      - cursor
+      - kiro
+      - windsurf
+      - agy
+    timeout: 300            # seconds per editor before timeout
+    # marketplace:          # optional: override marketplace per editor
+    #   windsurf: openvsx   # "vsmarketplace" (default) | "openvsx"
+
+  omz:
+    enabled: true
+
+  vim:
+    enabled: true
+    update_script: ~/bin/update-vim.sh  # external script (skips pathogen/bundles if set)
+    pathogen_dir: ~/.vim/autoload       # download latest pathogen.vim here
+    bundles_dir: ~/.vim/bundle          # git pull --rebase each subdirectory
+
+  vagrant:
+    enabled: true
+    notify: true            # send macOS notification when new version available
+
+  virtualbox:
+    enabled: true
+    notify: true            # send macOS notification when new version available
+
+notifications:
+  enabled: true
+  tool: terminal-notifier   # terminal-notifier | osascript
+
+logging:
+  dir: ~/Library/Logs/upkeep
+  level: info               # debug | info | warn | error

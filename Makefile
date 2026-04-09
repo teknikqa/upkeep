@@ -7,6 +7,31 @@ GOFLAGS  :=
 .PHONY: all
 all: build
 
+# Show available targets with descriptions
+.PHONY: help
+help:
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Targets:"
+	@echo "  all             Build the binary (default)"
+	@echo "  help            Show this help message"
+	@echo "  setup           Set up development environment (git hooks)"
+	@echo "  build           Build the binary in the current directory"
+	@echo "  install         Build and install to ~/bin/upkeep"
+	@echo "  test            Run all tests"
+	@echo "  test-verbose    Run tests with verbose output"
+	@echo "  lint            Run go vet + golangci-lint"
+	@echo "  fmt             Format all Go source files"
+	@echo "  tidy            Tidy go.mod / go.sum"
+	@echo "  coverage        Run tests with coverage and generate HTML report"
+	@echo "  clean           Remove built binary and coverage output"
+	@echo "  ci              Run full CI pipeline locally (fmt, lint, test, build)"
+	@echo "  check           Alias for ci"
+	@echo "  govulncheck     Run govulncheck for known vulnerabilities"
+	@echo "  release-dry-run GoReleaser dry-run (snapshot, no publish)"
+	@echo "  dry-run         Scan only, no updates"
+	@echo "  list            List all providers"
+
 # Set up development environment (git hooks, etc.)
 .PHONY: setup
 setup:
