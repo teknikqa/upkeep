@@ -1,0 +1,65 @@
+---
+name: Bug Report
+description: Report something that isn't working correctly.
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: upkeep version
+      description: "Output of `upkeep --version` or the release tag."
+      placeholder: "v0.6.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: macOS version
+      placeholder: "macOS 15.4 (Sequoia), Apple M2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: "Describe the bug clearly."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: "Minimal steps to trigger the bug."
+      placeholder: |
+        1. Run `upkeep --dry-run`
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / output
+      description: "Paste relevant terminal output or log file contents."
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Config (if relevant)
+      description: "Paste your `upkeep config show` output, redacting anything sensitive."
+      render: yaml
+    validations:
+      required: false
