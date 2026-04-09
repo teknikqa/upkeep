@@ -300,6 +300,7 @@ func PrintError(format string, args ...any) {
 }
 
 // ScanSummaryRowsFromResults converts scan results to ScanSummaryRows for rendering.
+// Rows are sorted alphabetically by display name for deterministic output.
 func ScanSummaryRowsFromResults(results map[string]provider.ScanResult, displayNames map[string]string) []ScanSummaryRow {
 	rows := make([]ScanSummaryRow, 0, len(results))
 	for name, r := range results {
@@ -321,6 +322,9 @@ func ScanSummaryRowsFromResults(results map[string]provider.ScanResult, displayN
 			Error:         r.Error,
 		})
 	}
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i].DisplayName < rows[j].DisplayName
+	})
 	return rows
 }
 

@@ -36,7 +36,7 @@ func List() []string {
 	return globalRegistry.List()
 }
 
-// GetAll returns all registered providers (order not guaranteed).
+// GetAll returns all registered providers sorted alphabetically by display name.
 // Providers self-register via init(), so the set is populated at package import time.
 func GetAll() []Provider {
 	return globalRegistry.GetAll()
@@ -83,7 +83,7 @@ func (r *Registry) List() []string {
 	return names
 }
 
-// GetAll returns all registered providers.
+// GetAll returns all registered providers sorted by display name.
 func (r *Registry) GetAll() []Provider {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -91,6 +91,9 @@ func (r *Registry) GetAll() []Provider {
 	for _, p := range r.providers {
 		ps = append(ps, p)
 	}
+	sort.Slice(ps, func(i, j int) bool {
+		return ps[i].DisplayName() < ps[j].DisplayName()
+	})
 	return ps
 }
 
