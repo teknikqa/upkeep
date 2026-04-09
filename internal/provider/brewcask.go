@@ -124,6 +124,15 @@ func (p *BrewCaskProvider) Update(ctx context.Context, items []OutdatedItem) Upd
 	// Handle auth-required casks per strategy.
 	switch p.cfg.AuthStrategy {
 	case "force-interactive":
+		// Pre-cache sudo credentials so the user is prompted at most once.
+		// `sudo -v` validates (and refreshes) the cached credential; subsequent
+		// brew processes that internally call sudo will reuse it within the
+		// default macOS timeout (typically 5–15 minutes).
+		if len(authReq) > 0 {
+			if _, err := RunCommandWithLog(ctx, p.logger, "sudo", "-v"); err != nil {
+				p.logf("sudo credential cache failed: %v (will prompt per-cask)", err)
+			}
+		}
 		for _, item := range authReq {
 			out, err := RunCommandWithLog(ctx, p.logger, "brew", "upgrade", "--cask", item.Name)
 			if err != nil {
