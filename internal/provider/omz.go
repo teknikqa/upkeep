@@ -78,6 +78,7 @@ func (p *OmzProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 	dir := omzDir()
 	start := time.Now()
 
+	ReportProgress(ctx, "oh-my-zsh", PackageStarting)
 	out, err := RunCommandWithLog(ctx, p.logger, "git", "-C", dir, "pull", "--rebase", "origin", "master")
 	if err != nil {
 		p.logf("git pull error: %v\n%s", err, out)

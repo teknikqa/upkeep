@@ -56,6 +56,7 @@ func (p *RustProvider) Update(ctx context.Context, items []OutdatedItem) UpdateR
 	var updated, failed []string
 
 	if p.cfg.Rustup && CommandExists("rustup") {
+		ReportProgress(ctx, "rustup-toolchains", PackageStarting)
 		out, err := RunCommandWithLog(ctx, p.logger, "rustup", "update")
 		if err != nil {
 			p.logf("rustup update error: %v\n%s", err, out)
@@ -68,6 +69,7 @@ func (p *RustProvider) Update(ctx context.Context, items []OutdatedItem) UpdateR
 	}
 
 	if p.cfg.CargoInstallUpdate && CommandExists("cargo") && CommandExists("cargo-install-update") {
+		ReportProgress(ctx, "cargo-binaries", PackageStarting)
 		out, err := RunCommandWithLog(ctx, p.logger, "cargo", "install-update", "-a")
 		if err != nil {
 			p.logf("cargo install-update error: %v\n%s", err, out)

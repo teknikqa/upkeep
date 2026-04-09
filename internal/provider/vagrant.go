@@ -94,6 +94,7 @@ func (p *VagrantProvider) Update(ctx context.Context, items []OutdatedItem) Upda
 	}
 
 	// Update plugins.
+	ReportProgress(ctx, "vagrant-plugins", PackageStarting)
 	out, err := RunCommandWithLog(ctx, p.logger, "vagrant", "plugin", "update")
 	if err != nil {
 		p.logf("vagrant plugin update error: %v\n%s", err, out)

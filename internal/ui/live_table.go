@@ -143,6 +143,13 @@ func (t *LiveUpdateTable) OnPackageProgress(providerName string, progress provid
 	}
 
 	switch progress.Status {
+	case provider.PackageStarting:
+		// Record which package is about to be processed (for the footer).
+		s.currentPkg = progress.Name
+		if IsTTY() {
+			t.render()
+		}
+		return
 	case provider.PackageUpdated:
 		s.updatedCount++
 	case provider.PackageFailed:

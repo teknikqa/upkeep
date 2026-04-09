@@ -66,6 +66,7 @@ func (p *NpmProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 	var updated, failed []string
 
 	for _, item := range items {
+		ReportProgress(ctx, item.Name, PackageStarting)
 		out, err := RunCommandWithLog(ctx, p.logger, "npm", "install", "-g", item.Name+"@latest")
 		if err != nil {
 			p.logf("npm install -g %s@latest error: %v\n%s", item.Name, err, out)

@@ -93,6 +93,7 @@ func (p *PipProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 				skipped = append(skipped, "pip")
 				ReportProgress(ctx, "pip", PackageSkipped)
 			} else {
+				ReportProgress(ctx, "pip", PackageStarting)
 				out, err := RunCommandWithLog(ctx, p.logger, "pip3", "install", "--upgrade", "pip")
 				if err != nil {
 					p.logf("pip3 upgrade pip error: %v\n%s", err, out)
@@ -109,6 +110,7 @@ func (p *PipProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 				skipped = append(skipped, "setuptools", "wheel", "virtualenv")
 				ReportProgress(ctx, "setuptools", PackageSkipped)
 			} else {
+				ReportProgress(ctx, "setuptools", PackageStarting)
 				out, err := RunCommandWithLog(ctx, p.logger, "pip3", "install", "--upgrade", "setuptools", "wheel", "virtualenv")
 				if err != nil {
 					p.logf("pip3 upgrade setuptools error: %v\n%s", err, out)
@@ -130,6 +132,7 @@ func (p *PipProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 				ReportProgress(ctx, item.Name, PackageSkipped)
 				continue
 			}
+			ReportProgress(ctx, item.Name, PackageStarting)
 			out, err := RunCommandWithLog(ctx, p.logger, "pip3", "install", "--upgrade", item.Name)
 			if err != nil {
 				p.logf("pip3 upgrade %s error: %v\n%s", item.Name, err, out)
@@ -143,6 +146,7 @@ func (p *PipProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 	}
 
 	if p.cfg.Pipx && CommandExists("pipx") {
+		ReportProgress(ctx, "pipx (all packages)", PackageStarting)
 		out, err := RunCommandWithLog(ctx, p.logger, "pipx", "upgrade-all")
 		if err != nil {
 			p.logf("pipx upgrade-all error: %v\n%s", err, out)

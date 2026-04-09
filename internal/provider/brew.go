@@ -84,6 +84,7 @@ func (p *BrewProvider) Update(ctx context.Context, items []OutdatedItem) UpdateR
 	}
 
 	args := append([]string{"upgrade", "--quiet"}, names...)
+	ReportProgress(ctx, strings.Join(names, ", "), PackageStarting)
 	output, err := RunCommandWithLog(ctx, p.logger, "brew", args...)
 	if err != nil {
 		p.logf("brew upgrade error: %v\n%s", err, output)

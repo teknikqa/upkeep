@@ -19,6 +19,8 @@ const (
 	PackageDeferred PackageStatus = "deferred"
 	// PackageSkipped means the package was skipped (e.g., config skip-list).
 	PackageSkipped PackageStatus = "skipped"
+	// PackageStarting means the package is about to be processed.
+	PackageStarting PackageStatus = "starting"
 )
 
 // PackageProgress reports the completion of a single package within a provider.

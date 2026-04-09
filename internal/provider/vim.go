@@ -119,6 +119,7 @@ func (p *VimProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 	if p.cfg.PathogenDir != "" {
 		if _, err := os.Stat(p.cfg.PathogenDir); err == nil {
 			dest := filepath.Join(p.cfg.PathogenDir, "pathogen.vim")
+			ReportProgress(ctx, "pathogen.vim", PackageStarting)
 			if err := downloadFile(ctx, pathogenURL, dest); err != nil {
 				p.logf("downloading pathogen: %v", err)
 				failed = append(failed, "pathogen.vim")
@@ -143,6 +144,7 @@ func (p *VimProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 				if _, err := os.Stat(gitDir); os.IsNotExist(err) {
 					continue
 				}
+				ReportProgress(ctx, e.Name(), PackageStarting)
 				out, err := RunCommandWithLog(ctx, p.logger, "git", "-C", bundleDir, "pull", "--rebase")
 				if err != nil {
 					p.logf("git pull %s error: %v\n%s", e.Name(), err, out)

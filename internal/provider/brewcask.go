@@ -109,6 +109,7 @@ func (p *BrewCaskProvider) Update(ctx context.Context, items []OutdatedItem) Upd
 
 	// Update non-auth casks with NONINTERACTIVE=1.
 	for _, item := range noAuth {
+		ReportProgress(ctx, item.Name, PackageStarting)
 		env := []string{"NONINTERACTIVE=1"}
 		out, err := RunCommandEnvWithLog(ctx, p.logger, env, "brew", "upgrade", "--cask", item.Name)
 		if err != nil {
@@ -134,6 +135,7 @@ func (p *BrewCaskProvider) Update(ctx context.Context, items []OutdatedItem) Upd
 			}
 		}
 		for _, item := range authReq {
+			ReportProgress(ctx, item.Name, PackageStarting)
 			out, err := RunCommandWithLog(ctx, p.logger, "brew", "upgrade", "--cask", item.Name)
 			if err != nil {
 				p.logf("brew upgrade --cask %s (interactive) error: %v\n%s", item.Name, err, out)

@@ -146,6 +146,7 @@ func (p *EditorProvider) Update(ctx context.Context, _ []OutdatedItem) UpdateRes
 		if !CommandExists(editor) {
 			continue
 		}
+		ReportProgress(ctx, editor, PackageStarting)
 		editorCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSecs)*time.Second)
 		out, err := RunCommandWithLog(editorCtx, p.logger, editor, "--update-extensions")
 		cancel()
