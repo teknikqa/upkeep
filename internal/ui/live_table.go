@@ -25,6 +25,7 @@ type providerUpdateState struct {
 	duration      time.Duration
 	startTime     time.Time // set when status becomes "updating"
 	currentPkg    string    // package currently being processed (for footer)
+	packages      []string  // accumulated package names (all outcomes) for the Packages column
 }
 
 // LiveUpdateTable renders the scan summary table as a live-updating view during
@@ -152,6 +153,11 @@ func (t *LiveUpdateTable) OnPackageProgress(providerName string, progress provid
 		s.skippedCount++
 	}
 
+	// Record the package name for the Packages column.
+	if progress.Name != "" {
+		s.packages = append(s.packages, progress.Name)
+	}
+
 	// Clear the current package indicator since this one just finished.
 	s.currentPkg = ""
 
@@ -190,6 +196,9 @@ func (t *LiveUpdateTable) OnProviderComplete(name string, result provider.Update
 	s.failedCount = len(result.Failed)
 	s.duration = result.Duration
 	s.currentPkg = ""
+
+	// Build the authoritative package list from the final result.
+	s.packages = buildFinalPackages(result)
 
 	switch {
 	case result.Error != nil && s.updatedCount == 0 && len(result.Deferred) == 0:
@@ -280,6 +289,13 @@ func (t *LiveUpdateTable) render() {
 		status, outdated := t.rowStatusAndOutdated(r, s)
 		upd, def, skip, fail, dur := t.reportColumns(s)
 
+		// Use accumulated package names from state when available (updating/completed);
+		// fall back to scan-time r.Packages for pending providers.
+		pkgs := r.Packages
+		if s != nil && s.status != "pending" && s.status != "unavailable" && len(s.packages) > 0 {
+			pkgs = s.packages
+		}
+
 		if len(r.PackageGroups) > 0 {
 			intermediate = append(intermediate, iRow{r.DisplayName, status, outdated, upd, def, skip, fail, dur, nil})
 			for _, sub := range GroupSubRows(r.PackageGroups) {
@@ -290,7 +306,7 @@ func (t *LiveUpdateTable) render() {
 			}
 		} else {
 			intermediate = append(intermediate, iRow{
-				r.DisplayName, status, outdated, upd, def, skip, fail, dur, r.Packages,
+				r.DisplayName, status, outdated, upd, def, skip, fail, dur, pkgs,
 			})
 		}
 	}
@@ -507,4 +523,19 @@ func (t *LiveUpdateTable) displayNameFor(name string) string {
 		}
 	}
 	return name
+}
+
+// buildFinalPackages combines all outcome lists from an UpdateResult into a
+// single deduplicated package list for the Packages column.
+func buildFinalPackages(result provider.UpdateResult) []string {
+	total := len(result.Updated) + len(result.Deferred) + len(result.Skipped) + len(result.Failed)
+	if total == 0 {
+		return nil
+	}
+	pkgs := make([]string, 0, total)
+	pkgs = append(pkgs, result.Updated...)
+	pkgs = append(pkgs, result.Deferred...)
+	pkgs = append(pkgs, result.Skipped...)
+	pkgs = append(pkgs, result.Failed...)
+	return pkgs
 }
