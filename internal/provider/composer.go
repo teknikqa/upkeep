@@ -50,36 +50,31 @@ func (p *ComposerProvider) Scan(ctx context.Context) ScanResult {
 	return ScanResult{Available: true, Outdated: items}
 }
 
-// Update runs `composer global update` to update all global packages.
+// Update runs `composer global update <package>` for each outdated package.
 func (p *ComposerProvider) Update(ctx context.Context, items []OutdatedItem) UpdateResult {
 	if len(items) == 0 {
 		return UpdateResult{}
 	}
 
 	start := time.Now()
-	names := make([]string, 0, len(items))
+	var updated, failed []string
+
 	for _, item := range items {
-		names = append(names, item.Name)
-	}
-
-	ReportProgress(ctx, strings.Join(names, ", "), PackageStarting)
-	out, err := RunCommandWithLog(ctx, p.logger, "composer", "global", "update")
-	if err != nil {
-		p.logf("composer global update error: %v\n%s", err, out)
-		for _, n := range names {
-			ReportProgress(ctx, n, PackageFailed)
-		}
-		return UpdateResult{
-			Failed:   names,
-			Duration: time.Since(start),
+		ReportProgress(ctx, item.Name, PackageStarting)
+		out, err := RunCommandWithLog(ctx, p.logger, "composer", "global", "update", item.Name)
+		if err != nil {
+			p.logf("composer global update %s error: %v\n%s", item.Name, err, out)
+			failed = append(failed, item.Name)
+			ReportProgress(ctx, item.Name, PackageFailed)
+		} else {
+			updated = append(updated, item.Name)
+			ReportProgress(ctx, item.Name, PackageUpdated)
 		}
 	}
 
-	for _, n := range names {
-		ReportProgress(ctx, n, PackageUpdated)
-	}
 	return UpdateResult{
-		Updated:  names,
+		Updated:  updated,
+		Failed:   failed,
 		Duration: time.Since(start),
 	}
 }
