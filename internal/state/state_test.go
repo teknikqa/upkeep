@@ -104,7 +104,7 @@ func TestGetDeferred(t *testing.T) {
 
 	s := state.New(path)
 	s.Deferred = state.DeferredState{
-		Casks:            []string{"docker", "virtualbox"},
+		Casks:            []string{"docker", "some-auth-cask"},
 		Script:           "/some/path/deferred.sh",
 		NotificationSent: true,
 	}

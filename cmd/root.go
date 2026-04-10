@@ -133,17 +133,16 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 // filterEnabledProviders returns providers that are enabled in the config.
 func filterEnabledProviders(providers []provider.Provider, cfg *config.Config) []provider.Provider {
 	enabled := map[string]bool{
-		"brew":       cfg.Providers.Brew.Enabled,
-		"brew-cask":  cfg.Providers.BrewCask.Enabled,
-		"npm":        cfg.Providers.Npm.Enabled,
-		"composer":   cfg.Providers.Composer.Enabled,
-		"pip":        cfg.Providers.Pip.Enabled,
-		"rust":       cfg.Providers.Rust.Enabled,
-		"editor":     cfg.Providers.Editor.Enabled,
-		"omz":        cfg.Providers.Omz.Enabled,
-		"vim":        cfg.Providers.Vim.Enabled,
-		"vagrant":    cfg.Providers.Vagrant.Enabled,
-		"virtualbox": cfg.Providers.VirtualBox.Enabled,
+		"brew":      cfg.Providers.Brew.Enabled,
+		"brew-cask": cfg.Providers.BrewCask.Enabled,
+		"npm":       cfg.Providers.Npm.Enabled,
+		"composer":  cfg.Providers.Composer.Enabled,
+		"pip":       cfg.Providers.Pip.Enabled,
+		"rust":      cfg.Providers.Rust.Enabled,
+		"editor":    cfg.Providers.Editor.Enabled,
+		"omz":       cfg.Providers.Omz.Enabled,
+		"vim":       cfg.Providers.Vim.Enabled,
+		"vagrant":   cfg.Providers.Vagrant.Enabled,
 	}
 
 	var result []provider.Provider

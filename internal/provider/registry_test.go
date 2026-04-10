@@ -190,7 +190,6 @@ func TestProvider_DisplayNameAndDependsOn(t *testing.T) {
 		{"rust", "Rust (rustup + cargo)", nil},
 		{"vagrant", "Vagrant", nil},
 		{"vim", "Vim Plugins", nil},
-		{"virtualbox", "VirtualBox", nil},
 	}
 
 	for _, tt := range tests {

@@ -47,7 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Oh My Zsh (`omz`)
   - Vim plugins via vim-plug (`vim`)
   - Vagrant boxes (`vagrant`)
-  - VirtualBox extension pack (`virtualbox`)
 - **Auth detection**: Config override → dry-run probe → heuristic fallback for cask authentication
 - **Deferred cask script**: Auth-required casks written to `~/.local/state/upkeep/deferred-cask.sh` with secure permissions
 - **CI**: GitHub Actions for build, test (with race detector), and golangci-lint
