@@ -75,12 +75,12 @@ func TestIntegration_MixedSuccessFailureDeferred(t *testing.T) {
 				Available: true,
 				Outdated: []provider.OutdatedItem{
 					{Name: "docker", AuthRequired: false},
-					{Name: "virtualbox", AuthRequired: true},
+					{Name: "some-auth-cask", AuthRequired: true},
 				},
 			},
 			updateResult: provider.UpdateResult{
 				Updated:  []string{"docker"},
-				Deferred: []string{"virtualbox"},
+				Deferred: []string{"some-auth-cask"},
 			},
 		},
 		// rust: completely fails.
@@ -149,7 +149,7 @@ func TestIntegration_MixedSuccessFailureDeferred(t *testing.T) {
 	if caskStatus.Status != "success" {
 		t.Errorf("brew-cask: expected status=success (updated+deferred), got %q", caskStatus.Status)
 	}
-	if len(caskStatus.Deferred) != 1 || caskStatus.Deferred[0] != "virtualbox" {
+	if len(caskStatus.Deferred) != 1 || caskStatus.Deferred[0] != "some-auth-cask" {
 		t.Errorf("brew-cask: unexpected deferred list: %v", caskStatus.Deferred)
 	}
 
@@ -166,8 +166,8 @@ func TestIntegration_MixedSuccessFailureDeferred(t *testing.T) {
 	}
 
 	// Deferred state should have brew-cask's deferred cask.
-	if len(loaded.Deferred.Casks) != 1 || loaded.Deferred.Casks[0] != "virtualbox" {
-		t.Errorf("deferred casks: expected [virtualbox], got %v", loaded.Deferred.Casks)
+	if len(loaded.Deferred.Casks) != 1 || loaded.Deferred.Casks[0] != "some-auth-cask" {
+		t.Errorf("deferred casks: expected [some-auth-cask], got %v", loaded.Deferred.Casks)
 	}
 	if loaded.Deferred.Script == "" {
 		t.Error("deferred script path should be populated in state")

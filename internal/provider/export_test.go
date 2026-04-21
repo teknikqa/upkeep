@@ -100,12 +100,6 @@ func ParseVagrantVersion(output string) (installed, latest string) {
 	return parseVagrantVersion(output)
 }
 
-// ParseVirtualBoxVersion strips the build suffix from a VBoxManage --version string.
-func ParseVirtualBoxVersion(output string) string {
-	p := &VirtualBoxProvider{}
-	return p.stripBuildSuffix(output)
-}
-
 // ParseExtensionList exposes parseExtensionList for testing.
 func ParseExtensionList(output string) []marketplace.Extension {
 	return parseExtensionList(output)

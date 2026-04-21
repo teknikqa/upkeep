@@ -12,7 +12,7 @@ A Go CLI tool that keeps your macOS development environment up to date.
 
 ## Features
 
-- **11 providers**: Homebrew formulae, Homebrew casks, npm, Composer, pip, Rust, VS Code extensions, Oh My Zsh, Vim, Vagrant, VirtualBox
+- **10 providers**: Homebrew formulae, Homebrew casks, npm, Composer, pip, Rust, VS Code extensions, Oh My Zsh, Vim, Vagrant
 - **Scan → Confirm → Execute → Report pipeline** with pterm TUI output
 - **Parallel execution** with configurable parallelism and dependency ordering (brew-cask waits for brew)
 - **Auth-required cask partitioning**: detects which casks need admin auth via dry-run probe + heuristic fallback; defers them to a separate script
@@ -120,7 +120,6 @@ providers:
     auth_strategy: defer    # defer | skip | force-interactive
     auth_overrides:
       docker: false         # never requires auth
-      virtualbox: true      # always requires auth
     rebuild_open_with: true
 
   npm:

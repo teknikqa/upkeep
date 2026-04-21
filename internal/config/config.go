@@ -27,17 +27,16 @@ type Config struct {
 
 // ProvidersConfig holds per-provider configuration.
 type ProvidersConfig struct {
-	Brew       BrewConfig       `yaml:"brew"`
-	BrewCask   BrewCaskConfig   `yaml:"brew-cask"`
-	Npm        NpmConfig        `yaml:"npm"`
-	Composer   ComposerConfig   `yaml:"composer"`
-	Pip        PipConfig        `yaml:"pip"`
-	Rust       RustConfig       `yaml:"rust"`
-	Editor     EditorConfig     `yaml:"editor"`
-	Omz        OmzConfig        `yaml:"omz"`
-	Vim        VimConfig        `yaml:"vim"`
-	Vagrant    VagrantConfig    `yaml:"vagrant"`
-	VirtualBox VirtualBoxConfig `yaml:"virtualbox"`
+	Brew     BrewConfig     `yaml:"brew"`
+	BrewCask BrewCaskConfig `yaml:"brew-cask"`
+	Npm      NpmConfig      `yaml:"npm"`
+	Composer ComposerConfig `yaml:"composer"`
+	Pip      PipConfig      `yaml:"pip"`
+	Rust     RustConfig     `yaml:"rust"`
+	Editor   EditorConfig   `yaml:"editor"`
+	Omz      OmzConfig      `yaml:"omz"`
+	Vim      VimConfig      `yaml:"vim"`
+	Vagrant  VagrantConfig  `yaml:"vagrant"`
 }
 
 // BrewConfig configures the Homebrew formulae provider.
@@ -110,12 +109,6 @@ type VagrantConfig struct {
 	Notify  bool `yaml:"notify"`
 }
 
-// VirtualBoxConfig configures the VirtualBox provider.
-type VirtualBoxConfig struct {
-	Enabled bool `yaml:"enabled"`
-	Notify  bool `yaml:"notify"`
-}
-
 // NotificationsConfig configures macOS notifications.
 type NotificationsConfig struct {
 	Enabled bool   `yaml:"enabled"`
@@ -173,8 +166,7 @@ func Defaults() *Config {
 				PathogenDir:  "~/.vim/autoload",
 				BundlesDir:   "~/.vim/bundle",
 			},
-			Vagrant:    VagrantConfig{Enabled: true, Notify: true},
-			VirtualBox: VirtualBoxConfig{Enabled: true, Notify: true},
+			Vagrant: VagrantConfig{Enabled: true, Notify: true},
 		},
 		Notifications: NotificationsConfig{
 			Enabled: true,

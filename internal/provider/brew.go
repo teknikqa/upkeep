@@ -69,7 +69,7 @@ func (p *BrewProvider) Scan(ctx context.Context) ScanResult {
 	}
 }
 
-// Update upgrades the specified formulae and runs post-hooks.
+// Update upgrades the specified formulae one-by-one and runs post-hooks.
 func (p *BrewProvider) Update(ctx context.Context, items []OutdatedItem) UpdateResult {
 	if len(items) == 0 {
 		return UpdateResult{}
@@ -78,24 +78,16 @@ func (p *BrewProvider) Update(ctx context.Context, items []OutdatedItem) UpdateR
 	start := time.Now()
 	var updated, failed []string
 
-	names := make([]string, 0, len(items))
 	for _, item := range items {
-		names = append(names, item.Name)
-	}
-
-	args := append([]string{"upgrade", "--quiet"}, names...)
-	ReportProgress(ctx, strings.Join(names, ", "), PackageStarting)
-	output, err := RunCommandWithLog(ctx, p.logger, "brew", args...)
-	if err != nil {
-		p.logf("brew upgrade error: %v\n%s", err, output)
-		failed = names
-		for _, n := range names {
-			ReportProgress(ctx, n, PackageFailed)
-		}
-	} else {
-		updated = names
-		for _, n := range names {
-			ReportProgress(ctx, n, PackageUpdated)
+		ReportProgress(ctx, item.Name, PackageStarting)
+		output, err := RunCommandWithLog(ctx, p.logger, "brew", "upgrade", "--quiet", item.Name)
+		if err != nil {
+			p.logf("brew upgrade %s error: %v\n%s", item.Name, err, output)
+			failed = append(failed, item.Name)
+			ReportProgress(ctx, item.Name, PackageFailed)
+		} else {
+			updated = append(updated, item.Name)
+			ReportProgress(ctx, item.Name, PackageUpdated)
 		}
 	}
 

@@ -180,7 +180,6 @@ func editProvidersSection(cfg *config.Config) error {
 			formatMenuLabel("Oh My Zsh", cfg.Providers.Omz.Enabled),
 			formatMenuLabel("Vim", cfg.Providers.Vim.Enabled),
 			formatMenuLabel("Vagrant", cfg.Providers.Vagrant.Enabled),
-			formatMenuLabel("VirtualBox", cfg.Providers.VirtualBox.Enabled),
 			"Back",
 		}
 
@@ -233,10 +232,6 @@ func editProvidersSection(cfg *config.Config) error {
 			}
 		case startsWith(choice, "Vagrant"):
 			if err := editVagrantProvider(cfg); err != nil {
-				return err
-			}
-		case startsWith(choice, "VirtualBox"):
-			if err := editVirtualBoxProvider(cfg); err != nil {
 				return err
 			}
 		}
@@ -624,38 +619,6 @@ func editVagrantProvider(cfg *config.Config) error {
 				return err
 			}
 			cfg.Providers.Vagrant.Notify = v
-		}
-	}
-}
-
-func editVirtualBoxProvider(cfg *config.Config) error {
-	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("VirtualBox Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", cfg.Providers.VirtualBox.Enabled),
-				formatMenuLabel("Notify", cfg.Providers.VirtualBox.Notify),
-				"Back",
-			}).
-			Show()
-		if err != nil {
-			return err
-		}
-		switch {
-		case choice == "Back":
-			return nil
-		case startsWith(choice, "Enabled"):
-			v, err := editBool("Enable VirtualBox", cfg.Providers.VirtualBox.Enabled)
-			if err != nil {
-				return err
-			}
-			cfg.Providers.VirtualBox.Enabled = v
-		case startsWith(choice, "Notify"):
-			v, err := editBool("Send notifications", cfg.Providers.VirtualBox.Notify)
-			if err != nil {
-				return err
-			}
-			cfg.Providers.VirtualBox.Notify = v
 		}
 	}
 }

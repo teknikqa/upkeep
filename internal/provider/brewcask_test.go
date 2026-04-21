@@ -149,7 +149,7 @@ func TestBrewCaskProvider_Update_DeferredItems(t *testing.T) {
 	)
 
 	items := []provider.OutdatedItem{
-		{Name: "virtualbox", AuthRequired: true},
+		{Name: "some-auth-cask", AuthRequired: true},
 		{Name: "vagrant", AuthRequired: true},
 	}
 	result := p.Update(context.Background(), items)
