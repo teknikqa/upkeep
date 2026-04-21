@@ -1,6 +1,7 @@
 package provider_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/teknikqa/upkeep/internal/config"
@@ -151,5 +152,27 @@ func TestComposerProvider_Registered(t *testing.T) {
 	}
 	if p.Name() != "composer" {
 		t.Errorf("expected composer, got %s", p.Name())
+	}
+}
+
+func TestComposerProvider_Update_Empty(t *testing.T) {
+	p := provider.NewComposerProvider(config.ComposerConfig{Enabled: true}, nil)
+	result := p.Update(context.Background(), nil)
+	if len(result.Updated) != 0 || len(result.Failed) != 0 {
+		t.Errorf("expected empty result for nil items, got updated=%v failed=%v", result.Updated, result.Failed)
+	}
+}
+
+func TestComposerProvider_Update_ItemsAccountedFor(t *testing.T) {
+	p := provider.NewComposerProvider(config.ComposerConfig{Enabled: true}, nil)
+	items := []provider.OutdatedItem{
+		{Name: "phpunit/phpunit"},
+		{Name: "squizlabs/php_codesniffer"},
+	}
+	result := p.Update(context.Background(), items)
+	// Without composer installed, commands will fail — items should land in Failed.
+	total := len(result.Updated) + len(result.Failed)
+	if total != 2 {
+		t.Errorf("expected 2 items accounted for, got updated=%v failed=%v", result.Updated, result.Failed)
 	}
 }
