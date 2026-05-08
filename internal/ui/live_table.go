@@ -278,15 +278,16 @@ func (t *LiveUpdateTable) render() {
 	// Build intermediate rows — same logic as RenderScanSummaryTable but with
 	// report columns (Updated, Deferred, Skipped, Failed, Duration).
 	type iRow struct {
-		provider string
-		status   string
-		outdated string
-		upd      string
-		def      string
-		skip     string
-		fail     string
-		dur      string
-		packages []string
+		provider      string
+		status        string
+		outdated      string
+		upd           string
+		def           string
+		skip          string
+		fail          string
+		dur           string
+		packages      []string
+		remainingLine string // "| To update: ..." shown on a separate line
 	}
 	var intermediate []iRow
 
@@ -303,17 +304,31 @@ func (t *LiveUpdateTable) render() {
 			pkgs = s.packages
 		}
 
+		// When a provider is actively updating, show remaining packages on a
+		// separate line after the processed ones.
+		var remainingLine string
+		if s != nil && s.status == "updating" && len(r.Packages) > 0 {
+			remaining := remainingPackages(r.Packages, s.packages)
+			if len(remaining) > 0 {
+				remainingLine = "| Remaining: " + strings.Join(remaining, ", ")
+				if len(s.packages) == 0 {
+					// Nothing processed yet — only show the remaining line.
+					pkgs = nil
+				}
+			}
+		}
+
 		if len(r.PackageGroups) > 0 {
-			intermediate = append(intermediate, iRow{r.DisplayName, status, outdated, upd, def, skip, fail, dur, nil})
+			intermediate = append(intermediate, iRow{r.DisplayName, status, outdated, upd, def, skip, fail, dur, nil, ""})
 			for _, sub := range GroupSubRows(r.PackageGroups) {
 				// Sub-rows: carry parent status, show per-group count, blank report cols.
 				intermediate = append(intermediate, iRow{
-					sub.Label, status, fmt.Sprintf("%d", sub.Count), "", "", "", "", "", sub.PkgNames,
+					sub.Label, status, fmt.Sprintf("%d", sub.Count), "", "", "", "", "", sub.PkgNames, "",
 				})
 			}
 		} else {
 			intermediate = append(intermediate, iRow{
-				r.DisplayName, status, outdated, upd, def, skip, fail, dur, pkgs,
+				r.DisplayName, status, outdated, upd, def, skip, fail, dur, pkgs, remainingLine,
 			})
 		}
 	}
@@ -367,6 +382,16 @@ func (t *LiveUpdateTable) render() {
 	}
 	for _, ir := range intermediate {
 		pkgLines := WrapPackages(ir.packages, maxPkgWidth)
+		// Append the "To update" remaining-packages line if present.
+		if ir.remainingLine != "" {
+			wrapped := wrapString(ir.remainingLine, maxPkgWidth)
+			if len(ir.packages) == 0 {
+				// Nothing processed yet — replace the "-" placeholder.
+				pkgLines = wrapped
+			} else {
+				pkgLines = append(pkgLines, wrapped...)
+			}
+		}
 		data = append(data, []string{ir.provider, ir.status, ir.outdated, ir.upd, ir.def, ir.skip, ir.fail, ir.dur, pkgLines[0]})
 		for _, cont := range pkgLines[1:] {
 			data = append(data, []string{"", "", "", "", "", "", "", "", cont})
@@ -530,6 +555,50 @@ func (t *LiveUpdateTable) displayNameFor(name string) string {
 		}
 	}
 	return name
+}
+
+// remainingPackages returns the items in allOutdated that are not yet in processed.
+func remainingPackages(allOutdated, processed []string) []string {
+	done := make(map[string]struct{}, len(processed))
+	for _, p := range processed {
+		done[p] = struct{}{}
+	}
+	var remaining []string
+	for _, p := range allOutdated {
+		if _, ok := done[p]; !ok {
+			remaining = append(remaining, p)
+		}
+	}
+	return remaining
+}
+
+// wrapString splits a long string into lines that fit within maxWidth.
+func wrapString(s string, maxWidth int) []string {
+	if maxWidth <= 0 {
+		maxWidth = 1
+	}
+	if len(s) <= maxWidth {
+		return []string{s}
+	}
+	var lines []string
+	for len(s) > maxWidth {
+		// Try to break at a space or comma near the boundary.
+		cut := maxWidth
+		for cut > 0 && s[cut] != ' ' && s[cut] != ',' {
+			cut--
+		}
+		if cut == 0 {
+			cut = maxWidth // no good break point; hard-cut
+		} else if s[cut] == ',' {
+			cut++ // include the comma
+		}
+		lines = append(lines, strings.TrimRight(s[:cut], " "))
+		s = strings.TrimLeft(s[cut:], " ")
+	}
+	if len(s) > 0 {
+		lines = append(lines, s)
+	}
+	return lines
 }
 
 // buildFinalPackages combines all outcome lists from an UpdateResult into a
