@@ -295,6 +295,67 @@ func TestActivePackagesFooter_Truncation(t *testing.T) {
 	}
 }
 
+// TestFormatUpdatingPackages tests the in-progress Packages column rendering.
+func TestFormatUpdatingPackages(t *testing.T) {
+	tests := []struct {
+		name      string
+		completed []string
+		all       []string
+		maxWidth  int
+		want      []string
+	}{
+		{
+			name:      "merged on one line",
+			completed: []string{"chatgpt", "codex"},
+			all:       []string{"chatgpt", "codex", "codex-app", "cursor"},
+			maxWidth:  200,
+			want:      []string{"chatgpt, codex | Remaining: codex-app, cursor"},
+		},
+		{
+			name:      "split when too narrow to merge",
+			completed: []string{"chatgpt", "codex"},
+			all:       []string{"chatgpt", "codex", "codex-app", "cursor"},
+			maxWidth:  20,
+			want:      []string{"chatgpt, codex", "Remaining: codex-app", "cursor"},
+		},
+		{
+			name:      "nothing completed yet",
+			completed: nil,
+			all:       []string{"a", "b", "c"},
+			maxWidth:  200,
+			want:      []string{"Remaining: a, b, c"},
+		},
+		{
+			name:      "everything completed",
+			completed: []string{"a", "b"},
+			all:       []string{"a", "b"},
+			maxWidth:  200,
+			want:      []string{"a, b"},
+		},
+		{
+			name:      "both empty",
+			completed: nil,
+			all:       nil,
+			maxWidth:  200,
+			want:      []string{"-"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatUpdatingPackages(tt.completed, tt.all, tt.maxWidth)
+			if len(got) != len(tt.want) {
+				t.Fatalf("expected %d lines, got %d: %#v", len(tt.want), len(got), got)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("line %d: expected %q, got %q", i, tt.want[i], got[i])
+				}
+			}
+		})
+	}
+}
+
 // TestDisplayNameFor tests display name lookup.
 func TestDisplayNameFor(t *testing.T) {
 	lt := &LiveUpdateTable{
