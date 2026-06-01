@@ -356,6 +356,286 @@ func TestFormatUpdatingPackages(t *testing.T) {
 	}
 }
 
+// TestBuildUpdateTableRows_NonGrouped_Updating verifies that a provider whose
+// state is "updating" produces a row flagged for the "done | Remaining" format
+// with packages drawn from state.packages and allPackages from scan-time r.Packages.
+func TestBuildUpdateTableRows_NonGrouped_Updating(t *testing.T) {
+	lt := &LiveUpdateTable{
+		rows: []ScanSummaryRow{
+			{
+				ProviderName:  "brew",
+				DisplayName:   "Homebrew Casks",
+				OutdatedCount: 4,
+				Packages:      []string{"chatgpt", "codex", "cursor", "discord"},
+				Available:     true,
+			},
+		},
+		states: map[string]*providerUpdateState{
+			"brew": {
+				status:       "updating",
+				updatedCount: 1,
+				startTime:    time.Now(),
+				packages:     []string{"chatgpt"},
+			},
+		},
+	}
+
+	rows := lt.buildUpdateTableRows()
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(rows))
+	}
+	ir := rows[0]
+	if !ir.updating {
+		t.Errorf("expected updating=true, got false")
+	}
+	if len(ir.packages) != 1 || ir.packages[0] != "chatgpt" {
+		t.Errorf("expected packages=[chatgpt], got %#v", ir.packages)
+	}
+	wantAll := []string{"chatgpt", "codex", "cursor", "discord"}
+	if len(ir.allPackages) != len(wantAll) {
+		t.Fatalf("expected allPackages len %d, got %d (%#v)", len(wantAll), len(ir.allPackages), ir.allPackages)
+	}
+	for i, p := range wantAll {
+		if ir.allPackages[i] != p {
+			t.Errorf("allPackages[%d]: want %q, got %q", i, p, ir.allPackages[i])
+		}
+	}
+}
+
+// TestBuildUpdateTableRows_NonGrouped_Completed verifies that a successfully
+// completed provider does NOT use the updating format and reuses state.packages
+// as the final list.
+func TestBuildUpdateTableRows_NonGrouped_Completed(t *testing.T) {
+	lt := &LiveUpdateTable{
+		rows: []ScanSummaryRow{
+			{
+				ProviderName:  "brew",
+				DisplayName:   "Homebrew Casks",
+				OutdatedCount: 2,
+				Packages:      []string{"chatgpt", "codex"},
+				Available:     true,
+			},
+		},
+		states: map[string]*providerUpdateState{
+			"brew": {
+				status:       "success",
+				updatedCount: 2,
+				packages:     []string{"chatgpt", "codex"},
+			},
+		},
+	}
+
+	rows := lt.buildUpdateTableRows()
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(rows))
+	}
+	ir := rows[0]
+	if ir.updating {
+		t.Errorf("expected updating=false, got true")
+	}
+	if len(ir.allPackages) != 0 {
+		t.Errorf("expected allPackages=nil for non-updating, got %#v", ir.allPackages)
+	}
+}
+
+// TestBuildUpdateTableRows_NonGrouped_Pending verifies that a pending provider
+// uses r.Packages (scan-time list) as the package list.
+func TestBuildUpdateTableRows_NonGrouped_Pending(t *testing.T) {
+	lt := &LiveUpdateTable{
+		rows: []ScanSummaryRow{
+			{
+				ProviderName:  "brew",
+				DisplayName:   "Homebrew Casks",
+				OutdatedCount: 2,
+				Packages:      []string{"a", "b"},
+				Available:     true,
+			},
+		},
+		states: map[string]*providerUpdateState{
+			"brew": {status: "pending"},
+		},
+	}
+
+	rows := lt.buildUpdateTableRows()
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(rows))
+	}
+	if rows[0].updating {
+		t.Errorf("expected updating=false for pending state")
+	}
+	if len(rows[0].packages) != 2 || rows[0].packages[0] != "a" {
+		t.Errorf("expected packages=[a,b] from r.Packages, got %#v", rows[0].packages)
+	}
+}
+
+// TestBuildUpdateTableRows_Grouped verifies that providers with PackageGroups
+// produce a parent row plus one sub-row per group, with the sub-rows carrying
+// the group's package list and never using the updating format.
+func TestBuildUpdateTableRows_Grouped(t *testing.T) {
+	lt := &LiveUpdateTable{
+		rows: []ScanSummaryRow{
+			{
+				ProviderName:  "ext",
+				DisplayName:   "Code Editor Extensions",
+				OutdatedCount: 2,
+				Available:     true,
+				PackageGroups: map[string][]string{
+					"code":   {"openai.chatgpt"},
+					"cursor": {"ms-python.python"},
+				},
+			},
+		},
+		states: map[string]*providerUpdateState{
+			"ext": {status: "updating", startTime: time.Now()},
+		},
+	}
+
+	rows := lt.buildUpdateTableRows()
+	// Expect 1 parent + 2 sub-rows.
+	if len(rows) != 3 {
+		t.Fatalf("expected 3 rows (parent + 2 sub), got %d: %#v", len(rows), rows)
+	}
+	if rows[0].provider != "Code Editor Extensions" {
+		t.Errorf("expected parent row first, got %q", rows[0].provider)
+	}
+	for i := 1; i < len(rows); i++ {
+		if rows[i].updating {
+			t.Errorf("sub-row %d should not be marked updating", i)
+		}
+		if len(rows[i].packages) == 0 {
+			t.Errorf("sub-row %d expected packages, got empty", i)
+		}
+	}
+}
+
+// TestMaxPackageWidth_NarrowFloor verifies that very narrow terminals floor at 10.
+func TestMaxPackageWidth_NarrowFloor(t *testing.T) {
+	rows := []updateTableRow{
+		{provider: "p", status: "s", outdated: "1", upd: "0", def: "0", skip: "0", fail: "0", dur: "1s"},
+	}
+	if got := maxPackageWidth(rows, 10); got != 10 {
+		t.Errorf("expected floor of 10, got %d", got)
+	}
+}
+
+// TestMaxPackageWidth_WideTerm verifies leftover width with a wide terminal.
+func TestMaxPackageWidth_WideTerm(t *testing.T) {
+	rows := []updateTableRow{
+		{provider: "Homebrew Casks", status: "🔄 updating", outdated: "6", upd: "2", def: "0", skip: "0", fail: "0", dur: "36.9s"},
+	}
+	// Wide terminal — leftover should be positive and well above the floor.
+	got := maxPackageWidth(rows, 200)
+	if got < 50 {
+		t.Errorf("expected wide leftover, got %d", got)
+	}
+}
+
+// TestBuildTableData_Updating verifies that an updating row produces a Packages
+// cell rendered as "done | Remaining: rest" via formatUpdatingPackages.
+func TestBuildTableData_Updating(t *testing.T) {
+	rows := []updateTableRow{
+		{
+			provider: "Homebrew Casks", status: "🔄 updating", outdated: "4",
+			upd: "2", def: "0", skip: "0", fail: "0", dur: "1s",
+			packages: []string{"chatgpt", "codex"}, updating: true,
+			allPackages: []string{"chatgpt", "codex", "codex-app", "cursor"},
+		},
+	}
+	data := buildTableData(rows, 200)
+	// data[0] is header, data[1] is the only data row.
+	if len(data) != 2 {
+		t.Fatalf("expected 2 rows (header + data), got %d", len(data))
+	}
+	pkgCell := data[1][8]
+	want := "chatgpt, codex | Remaining: codex-app, cursor"
+	if pkgCell != want {
+		t.Errorf("expected Packages cell %q, got %q", want, pkgCell)
+	}
+}
+
+// TestBuildTableData_NonUpdating verifies WrapPackages is used for non-updating rows.
+func TestBuildTableData_NonUpdating(t *testing.T) {
+	rows := []updateTableRow{
+		{
+			provider: "Homebrew Casks", status: "✅ success", outdated: "0",
+			upd: "2", def: "0", skip: "0", fail: "0", dur: "1s",
+			packages: []string{"chatgpt", "codex"},
+		},
+	}
+	data := buildTableData(rows, 200)
+	pkgCell := data[1][8]
+	if pkgCell != "chatgpt, codex" {
+		t.Errorf("expected Packages cell %q, got %q", "chatgpt, codex", pkgCell)
+	}
+}
+
+// TestBuildTableData_WrappedContinuation verifies that long package lists wrap
+// onto continuation rows (which use blank cells for non-package columns).
+func TestBuildTableData_WrappedContinuation(t *testing.T) {
+	rows := []updateTableRow{
+		{
+			provider: "brew", status: "✅ success", outdated: "0",
+			upd: "3", def: "0", skip: "0", fail: "0", dur: "1s",
+			packages: []string{"alpha-package", "beta-package", "gamma-package"},
+		},
+	}
+	// Narrow Packages column forces a wrap.
+	data := buildTableData(rows, 15)
+	if len(data) < 3 {
+		t.Fatalf("expected header + data + continuation, got %d rows", len(data))
+	}
+	// Continuation row must have blank non-package cells.
+	cont := data[2]
+	for i := 0; i < 8; i++ {
+		if cont[i] != "" {
+			t.Errorf("continuation row col %d should be empty, got %q", i, cont[i])
+		}
+	}
+	if cont[8] == "" {
+		t.Errorf("continuation row should carry a packages chunk, got empty")
+	}
+}
+
+// TestRenderTableContent_UpdatingProvider verifies the end-to-end rendered
+// content includes the "Remaining:" marker for a provider mid-update.
+func TestRenderTableContent_UpdatingProvider(t *testing.T) {
+	lt := &LiveUpdateTable{
+		rows: []ScanSummaryRow{
+			{
+				ProviderName:  "brew",
+				DisplayName:   "Homebrew Casks",
+				OutdatedCount: 4,
+				Packages:      []string{"chatgpt", "codex", "codex-app", "cursor"},
+				Available:     true,
+			},
+		},
+		states: map[string]*providerUpdateState{
+			"brew": {
+				status:       "updating",
+				updatedCount: 2,
+				startTime:    time.Now(),
+				packages:     []string{"chatgpt", "codex"},
+				currentPkg:   "codex-app",
+			},
+		},
+	}
+
+	content := lt.renderTableContent(200)
+	if content == "" {
+		t.Fatal("expected non-empty rendered content")
+	}
+	if !contains(content, "Remaining: codex-app") {
+		t.Errorf("expected 'Remaining: codex-app' in content, got:\n%s", content)
+	}
+	if !contains(content, "chatgpt, codex") {
+		t.Errorf("expected 'chatgpt, codex' (done list) in content, got:\n%s", content)
+	}
+	// Footer should also show the actively updating package.
+	if !contains(content, "Homebrew Casks → codex-app") {
+		t.Errorf("expected active footer in content, got:\n%s", content)
+	}
+}
+
 // TestDisplayNameFor tests display name lookup.
 func TestDisplayNameFor(t *testing.T) {
 	lt := &LiveUpdateTable{
