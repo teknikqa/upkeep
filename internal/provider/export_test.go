@@ -85,6 +85,11 @@ func (p *PipProvider) SetCheckExternallyManaged(fn func(ctx context.Context) boo
 	p.checkExternallyManaged = fn
 }
 
+// SetListOutdated sets the pip3 list-outdated override on a PipProvider for testing.
+func (p *PipProvider) SetListOutdated(fn func(ctx context.Context) (string, error)) {
+	p.listOutdated = fn
+}
+
 // ParseRustupCheck exposes parseRustupCheck for testing.
 func ParseRustupCheck(output string) []OutdatedItem {
 	return parseRustupCheck(output)
