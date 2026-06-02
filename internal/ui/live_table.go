@@ -266,30 +266,29 @@ func (t *LiveUpdateTable) Stop() {
 	}
 }
 
-// render rebuilds and outputs the table. Must be called with t.mu held.
-// On TTY it calls area.Update; on non-TTY it is a no-op (StatusLine is used instead).
-func (t *LiveUpdateTable) render() {
-	if t.area == nil {
-		return
-	}
+// updateTableRow is one rendered row of the live update table prior to
+// width-aware package wrapping. Exported via the package-internal
+// buildUpdateTableRows helper so tests can verify row construction without
+// needing a pterm AreaPrinter.
+type updateTableRow struct {
+	provider    string
+	status      string
+	outdated    string
+	upd         string
+	def         string
+	skip        string
+	fail        string
+	dur         string
+	packages    []string
+	updating    bool     // when true, render packages as "done | Remaining: rest"
+	allPackages []string // full scan-time package list (only used when updating)
+}
 
-	tw := termWidth()
-
-	// Build intermediate rows — same logic as RenderScanSummaryTable but with
-	// report columns (Updated, Deferred, Skipped, Failed, Duration).
-	type iRow struct {
-		provider string
-		status   string
-		outdated string
-		upd      string
-		def      string
-		skip     string
-		fail     string
-		dur      string
-		packages []string
-	}
-	var intermediate []iRow
-
+// buildUpdateTableRows converts the provider scan rows and live state into
+// the intermediate row list used to build the table. Pure function with no
+// dependency on the AreaPrinter — safe to call from tests.
+func (t *LiveUpdateTable) buildUpdateTableRows() []updateTableRow {
+	var rows []updateTableRow
 	for _, r := range t.rows {
 		s := t.states[r.ProviderName]
 
@@ -304,21 +303,34 @@ func (t *LiveUpdateTable) render() {
 		}
 
 		if len(r.PackageGroups) > 0 {
-			intermediate = append(intermediate, iRow{r.DisplayName, status, outdated, upd, def, skip, fail, dur, nil})
+			rows = append(rows, updateTableRow{provider: r.DisplayName, status: status, outdated: outdated, upd: upd, def: def, skip: skip, fail: fail, dur: dur})
 			for _, sub := range GroupSubRows(r.PackageGroups) {
 				// Sub-rows: carry parent status, show per-group count, blank report cols.
-				intermediate = append(intermediate, iRow{
-					sub.Label, status, fmt.Sprintf("%d", sub.Count), "", "", "", "", "", sub.PkgNames,
+				rows = append(rows, updateTableRow{
+					provider: sub.Label, status: status, outdated: fmt.Sprintf("%d", sub.Count), packages: sub.PkgNames,
 				})
 			}
-		} else {
-			intermediate = append(intermediate, iRow{
-				r.DisplayName, status, outdated, upd, def, skip, fail, dur, pkgs,
-			})
+			continue
 		}
-	}
 
-	// Measure column widths.
+		ir := updateTableRow{
+			provider: r.DisplayName, status: status, outdated: outdated,
+			upd: upd, def: def, skip: skip, fail: fail, dur: dur,
+			packages: pkgs,
+		}
+		if s != nil && s.status == "updating" {
+			ir.updating = true
+			ir.packages = s.packages
+			ir.allPackages = r.Packages
+		}
+		rows = append(rows, ir)
+	}
+	return rows
+}
+
+// maxPackageWidth returns the leftover width available for the Packages
+// column given the intermediate rows and terminal width.
+func maxPackageWidth(rows []updateTableRow, termWidth int) int {
 	provW := len("Provider")
 	statusW := len("Status")
 	outdatedW := len("Outdated")
@@ -327,7 +339,7 @@ func (t *LiveUpdateTable) render() {
 	skipW := len("Skip")
 	failW := len("Fail")
 	durW := len("Dur")
-	for _, ir := range intermediate {
+	for _, ir := range rows {
 		if len(ir.provider) > provW {
 			provW = len(ir.provider)
 		}
@@ -357,25 +369,45 @@ func (t *LiveUpdateTable) render() {
 	// pterm uses " | " (3 chars) between each column pair.
 	// 9 columns → 8 separators × 3 = 24.
 	prefixWidth := provW + statusW + outdatedW + updW + defW + skipW + failW + durW + 24
-	maxPkgWidth := tw - prefixWidth
+	maxPkgWidth := termWidth - prefixWidth
 	if maxPkgWidth < 10 {
 		maxPkgWidth = 10
 	}
+	return maxPkgWidth
+}
 
+// buildTableData converts intermediate rows into pterm TableData with the
+// Packages column wrapped to maxPkgWidth. Pure function — safe for tests.
+func buildTableData(rows []updateTableRow, maxPkgWidth int) pterm.TableData {
 	data := pterm.TableData{
 		{"Provider", "Status", "Outdated", "Upd", "Def", "Skip", "Fail", "Dur", "Packages"},
 	}
-	for _, ir := range intermediate {
-		pkgLines := WrapPackages(ir.packages, maxPkgWidth)
+	for _, ir := range rows {
+		var pkgLines []string
+		if ir.updating {
+			pkgLines = formatUpdatingPackages(ir.packages, ir.allPackages, maxPkgWidth)
+		} else {
+			pkgLines = WrapPackages(ir.packages, maxPkgWidth)
+		}
 		data = append(data, []string{ir.provider, ir.status, ir.outdated, ir.upd, ir.def, ir.skip, ir.fail, ir.dur, pkgLines[0]})
 		for _, cont := range pkgLines[1:] {
 			data = append(data, []string{"", "", "", "", "", "", "", "", cont})
 		}
 	}
+	return data
+}
+
+// renderTableContent builds the full table string (table + active-packages
+// footer) without touching the AreaPrinter. Returns "" if pterm fails to
+// render. Pure enough to test directly.
+func (t *LiveUpdateTable) renderTableContent(termWidth int) string {
+	rows := t.buildUpdateTableRows()
+	maxPkgWidth := maxPackageWidth(rows, termWidth)
+	data := buildTableData(rows, maxPkgWidth)
 
 	rendered, err := pterm.DefaultTable.WithHasHeader().WithData(data).Srender()
 	if err != nil {
-		return
+		return ""
 	}
 
 	// Strip trailing whitespace per line (same as RenderScanSummaryTable).
@@ -385,13 +417,21 @@ func (t *LiveUpdateTable) render() {
 		sb.WriteString("\n")
 	}
 
-	// Append the active packages footer.
-	footer := t.activePackagesFooter(tw)
+	footer := t.activePackagesFooter(termWidth)
 	if footer != "" {
 		sb.WriteString(footer)
 	}
 
-	t.area.Update(strings.TrimRight(sb.String(), "\n"))
+	return strings.TrimRight(sb.String(), "\n")
+}
+
+// render rebuilds and outputs the table. Must be called with t.mu held.
+// On TTY it calls area.Update; on non-TTY it is a no-op (StatusLine is used instead).
+func (t *LiveUpdateTable) render() {
+	if t.area == nil {
+		return
+	}
+	t.area.Update(t.renderTableContent(termWidth()))
 }
 
 // activePackagesFooter builds a footer line showing which packages are currently
@@ -530,6 +570,53 @@ func (t *LiveUpdateTable) displayNameFor(name string) string {
 		}
 	}
 	return name
+}
+
+// formatUpdatingPackages renders the Packages column for a provider whose
+// status is "updating". It shows completed package names followed by a
+// "Remaining: ..." segment listing scan-time packages not yet processed.
+// When the last completed line plus " | Remaining: <first>" fits within
+// maxWidth, they are joined on the same line.
+func formatUpdatingPackages(completed, all []string, maxWidth int) []string {
+	done := make(map[string]struct{}, len(completed))
+	for _, p := range completed {
+		done[p] = struct{}{}
+	}
+	var remaining []string
+	for _, p := range all {
+		if _, ok := done[p]; !ok {
+			remaining = append(remaining, p)
+		}
+	}
+
+	switch {
+	case len(completed) == 0 && len(remaining) == 0:
+		return []string{"-"}
+	case len(remaining) == 0:
+		return WrapPackages(completed, maxWidth)
+	}
+
+	remList := make([]string, len(remaining))
+	remList[0] = "Remaining: " + remaining[0]
+	copy(remList[1:], remaining[1:])
+
+	if len(completed) == 0 {
+		return WrapPackages(remList, maxWidth)
+	}
+
+	doneLines := WrapPackages(completed, maxWidth)
+	remLines := WrapPackages(remList, maxWidth)
+
+	// If the last done line + " | " + first remaining line fits, merge them.
+	lastDone := doneLines[len(doneLines)-1]
+	firstRem := remLines[0]
+	merged := lastDone + " | " + firstRem
+	if len(merged) <= maxWidth {
+		doneLines[len(doneLines)-1] = merged
+		return append(doneLines, remLines[1:]...)
+	}
+
+	return append(doneLines, remLines...)
 }
 
 // buildFinalPackages combines all outcome lists from an UpdateResult into a
