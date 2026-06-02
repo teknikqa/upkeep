@@ -143,6 +143,58 @@ func TestIsExternallyManaged_MarkerFileAbsent(t *testing.T) {
 	}
 }
 
+// TestPipProvider_Scan_ExternallyManaged_OmitsPipPackages verifies that when
+// the environment is PEP 668 externally-managed, Scan does NOT list pip3
+// packages as outdated (since Update would skip them anyway) — only the pipx
+// pseudo-item should remain, with the externally-managed message attached.
+func TestPipProvider_Scan_ExternallyManaged_OmitsPipPackages(t *testing.T) {
+	if !provider.CommandExistsExport("pip3") {
+		t.Skip("pip3 not available")
+	}
+
+	p := provider.NewPipProvider(config.PipConfig{
+		Enabled:           true,
+		UpgradePip:        true,
+		UpgradeSetuptools: true,
+		Pipx:              true,
+	}, nil)
+	p.SetCheckExternallyManaged(func(_ context.Context) bool { return true })
+
+	result := p.Scan(context.Background())
+	if !result.Available {
+		t.Fatalf("expected Available=true, got false")
+	}
+	for _, item := range result.Outdated {
+		if item.Name != "pipx (all packages)" {
+			t.Errorf("expected only pipx pseudo-item when externally-managed, got %q", item.Name)
+		}
+	}
+	if result.Message == "" {
+		t.Error("expected non-empty externally-managed message")
+	}
+}
+
+// TestPipProvider_Scan_NotExternallyManaged_ListsPipPackages verifies that when
+// not externally-managed, parsed pip3 outdated packages are included.
+func TestPipProvider_Scan_NotExternallyManaged_ListsPipPackages(t *testing.T) {
+	if !provider.CommandExistsExport("pip3") {
+		t.Skip("pip3 not available")
+	}
+
+	p := provider.NewPipProvider(config.PipConfig{Enabled: true}, nil)
+	p.SetCheckExternallyManaged(func(_ context.Context) bool { return false })
+
+	result := p.Scan(context.Background())
+	if !result.Available {
+		t.Fatalf("expected Available=true, got false")
+	}
+	// We can't guarantee that any specific pip3 packages are outdated on this
+	// system, but we can verify the message is NOT the externally-managed one.
+	if result.Message != "" {
+		t.Errorf("expected empty message when not externally-managed, got %q", result.Message)
+	}
+}
+
 func TestPipProvider_Update_ExternallyManaged_PipxStillRuns(t *testing.T) {
 	if !provider.CommandExistsExport("pipx") {
 		t.Skip("pipx not available")

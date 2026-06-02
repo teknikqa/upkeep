@@ -51,17 +51,21 @@ func (p *PipProvider) Scan(ctx context.Context) ScanResult {
 	var message string
 
 	if pip3Exists {
-		stdout, _, err := RunCommand(ctx, "pip3", "list", "--outdated", "--format=json")
-		if err == nil && stdout != "" && stdout != "[]" {
-			parsed, parseErr := parsePipOutdated(stdout)
-			if parseErr != nil {
-				p.logf("parsing pip3 list output: %v", parseErr)
-			} else {
-				items = append(items, parsed...)
-			}
-		}
 		if p.isExternallyManagedEnv(ctx) {
+			// PEP 668 forbids system-wide pip installs; Update would skip every
+			// pip3 package, so don't list them as outdated and create a false
+			// "always pending" loop.
 			message = "pip3: externally-managed environment (PEP 668) — pip3 packages will be skipped"
+		} else {
+			stdout, _, err := RunCommand(ctx, "pip3", "list", "--outdated", "--format=json")
+			if err == nil && stdout != "" && stdout != "[]" {
+				parsed, parseErr := parsePipOutdated(stdout)
+				if parseErr != nil {
+					p.logf("parsing pip3 list output: %v", parseErr)
+				} else {
+					items = append(items, parsed...)
+				}
+			}
 		}
 	}
 
