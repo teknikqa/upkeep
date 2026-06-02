@@ -2,6 +2,7 @@ package provider_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -159,6 +160,11 @@ func TestPipProvider_Scan_ExternallyManaged_OmitsPipPackages(t *testing.T) {
 		Pipx:              true,
 	}, nil)
 	p.SetCheckExternallyManaged(func(_ context.Context) bool { return true })
+	// Inject so the test never shells out to a real pip3.
+	p.SetListOutdated(func(_ context.Context) (string, error) {
+		t.Fatal("pip3 list should not run when externally-managed")
+		return "", nil
+	})
 
 	result := p.Scan(context.Background())
 	if !result.Available {
@@ -174,24 +180,95 @@ func TestPipProvider_Scan_ExternallyManaged_OmitsPipPackages(t *testing.T) {
 	}
 }
 
-// TestPipProvider_Scan_NotExternallyManaged_ListsPipPackages verifies that when
-// not externally-managed, parsed pip3 outdated packages are included.
-func TestPipProvider_Scan_NotExternallyManaged_ListsPipPackages(t *testing.T) {
+// TestPipProvider_Scan_NotExternallyManaged verifies every pip3 list output
+// path: populated JSON, empty JSON ([]/empty string), parse error, and
+// command error.
+func TestPipProvider_Scan_NotExternallyManaged(t *testing.T) {
 	if !provider.CommandExistsExport("pip3") {
 		t.Skip("pip3 not available")
 	}
 
+	tests := []struct {
+		name              string
+		stdout            string
+		err               error
+		wantPipItemsCount int // expected non-pipx items
+	}{
+		{
+			name:              "populated outdated list",
+			stdout:            samplePipOutdated, // 2 packages
+			err:               nil,
+			wantPipItemsCount: 2,
+		},
+		{
+			name:              "empty list returns no pip items",
+			stdout:            "[]",
+			err:               nil,
+			wantPipItemsCount: 0,
+		},
+		{
+			name:              "empty stdout returns no pip items",
+			stdout:            "",
+			err:               nil,
+			wantPipItemsCount: 0,
+		},
+		{
+			name:              "malformed JSON logs parse error and drops list",
+			stdout:            "{ not valid json",
+			err:               nil,
+			wantPipItemsCount: 0,
+		},
+		{
+			name:              "command error drops list",
+			stdout:            "",
+			err:               errors.New("pip3 failed"),
+			wantPipItemsCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := provider.NewPipProvider(config.PipConfig{Enabled: true}, nil)
+			p.SetCheckExternallyManaged(func(_ context.Context) bool { return false })
+			p.SetListOutdated(func(_ context.Context) (string, error) {
+				return tt.stdout, tt.err
+			})
+
+			result := p.Scan(context.Background())
+			if !result.Available {
+				t.Fatalf("expected Available=true, got false")
+			}
+			if result.Message != "" {
+				t.Errorf("expected empty message when not externally-managed, got %q", result.Message)
+			}
+
+			gotPipItems := 0
+			for _, item := range result.Outdated {
+				if item.Name != "pipx (all packages)" {
+					gotPipItems++
+				}
+			}
+			if gotPipItems != tt.wantPipItemsCount {
+				t.Errorf("expected %d pip3 items, got %d (%+v)", tt.wantPipItemsCount, gotPipItems, result.Outdated)
+			}
+		})
+	}
+}
+
+// TestPipProvider_Scan_RealPip3 exercises the real `pip3 list --outdated`
+// invocation (no listOutdated override) to cover runListOutdated's default
+// branch. We don't assert specific contents — pip3 may or may not report
+// outdated packages — only that Scan completes without panicking.
+func TestPipProvider_Scan_RealPip3(t *testing.T) {
+	if !provider.CommandExistsExport("pip3") {
+		t.Skip("pip3 not available")
+	}
 	p := provider.NewPipProvider(config.PipConfig{Enabled: true}, nil)
 	p.SetCheckExternallyManaged(func(_ context.Context) bool { return false })
-
+	// No SetListOutdated — exercise the real pip3 invocation.
 	result := p.Scan(context.Background())
 	if !result.Available {
-		t.Fatalf("expected Available=true, got false")
-	}
-	// We can't guarantee that any specific pip3 packages are outdated on this
-	// system, but we can verify the message is NOT the externally-managed one.
-	if result.Message != "" {
-		t.Errorf("expected empty message when not externally-managed, got %q", result.Message)
+		t.Errorf("expected Available=true, got false")
 	}
 }
 

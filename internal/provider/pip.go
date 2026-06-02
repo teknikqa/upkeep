@@ -27,6 +27,10 @@ type PipProvider struct {
 	// checkExternallyManaged overrides the default PEP 668 detection for testing.
 	// When nil, the real isExternallyManaged function is used.
 	checkExternallyManaged func(ctx context.Context) bool
+
+	// listOutdated overrides the pip3 outdated query for testing. When nil,
+	// the real `pip3 list --outdated --format=json` is run.
+	listOutdated func(ctx context.Context) (string, error)
 }
 
 // NewPipProvider creates a new pip provider.
@@ -57,7 +61,7 @@ func (p *PipProvider) Scan(ctx context.Context) ScanResult {
 			// "always pending" loop.
 			message = "pip3: externally-managed environment (PEP 668) — pip3 packages will be skipped"
 		} else {
-			stdout, _, err := RunCommand(ctx, "pip3", "list", "--outdated", "--format=json")
+			stdout, err := p.runListOutdated(ctx)
 			if err == nil && stdout != "" && stdout != "[]" {
 				parsed, parseErr := parsePipOutdated(stdout)
 				if parseErr != nil {
@@ -212,6 +216,16 @@ func (p *PipProvider) isExternallyManagedEnv(ctx context.Context) bool {
 		return p.checkExternallyManaged(ctx)
 	}
 	return isExternallyManaged(ctx)
+}
+
+// runListOutdated calls the provider's override if set, otherwise runs the
+// real `pip3 list --outdated --format=json` command.
+func (p *PipProvider) runListOutdated(ctx context.Context) (string, error) {
+	if p.listOutdated != nil {
+		return p.listOutdated(ctx)
+	}
+	stdout, _, err := RunCommand(ctx, "pip3", "list", "--outdated", "--format=json")
+	return stdout, err
 }
 
 func (p *PipProvider) logf(format string, args ...any) {
