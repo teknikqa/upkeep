@@ -105,3 +105,26 @@ func TestNpmProvider_Registered(t *testing.T) {
 		t.Errorf("expected npm, got %s", p.Name())
 	}
 }
+
+func TestNpmProvider_Update_Empty(t *testing.T) {
+	p := provider.NewNpmProvider(config.NpmConfig{Enabled: true}, nil)
+	result := p.Update(context.Background(), nil)
+	if len(result.Updated) != 0 || len(result.Failed) != 0 {
+		t.Errorf("expected empty result for nil items, got updated=%v failed=%v", result.Updated, result.Failed)
+	}
+}
+
+func TestNpmProvider_Update_ItemsAccountedFor(t *testing.T) {
+	p := provider.NewNpmProvider(config.NpmConfig{Enabled: true}, nil)
+	items := []provider.OutdatedItem{
+		{Name: "npm-nonexistent-pkg-aaa"},
+		{Name: "npm-nonexistent-pkg-bbb"},
+	}
+	// These package names don't exist (and npm may be absent), so the batch and
+	// per-item fallback both fail — but every item must be accounted for.
+	result := p.Update(context.Background(), items)
+	total := len(result.Updated) + len(result.Failed)
+	if total != 2 {
+		t.Errorf("expected 2 items accounted for, got updated=%v failed=%v", result.Updated, result.Failed)
+	}
+}
