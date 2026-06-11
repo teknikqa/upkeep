@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Faster updates via batching.** Homebrew formulae, Homebrew casks (non-auth), npm global packages, and pip packages are now upgraded in a single batched command per provider instead of one-by-one. This is both faster (one process startup, with the package manager fetching downloads concurrently internally) and, for Homebrew specifically, the only way to parallelize — concurrent `brew` processes contend on Homebrew's global lock and cannot run simultaneously. Batching is also safer than firing concurrent `npm install -g` / `pip install` processes, which can corrupt shared install directories.
+- Failure isolation is retained: if a batched command reports an error, each package is retried individually so the updated/failed split stays exact (already-upgraded packages become fast no-ops). This restores the speed of the pre-0.7.0 batch behavior without its all-or-nothing failure reporting.
+- The update footer now shows batched packages as a group rather than naming the single in-progress package — the per-package progress added in 0.7.0 is coarser for these providers as a result.
+- Code editor extension updates now run concurrently across editors (each editor is an independent binary with no shared lock) instead of sequentially.
+
 ## [0.7.0] - 2026-04-10
 
 ### Changed

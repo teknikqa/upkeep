@@ -63,20 +63,35 @@ func (p *NpmProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 	}
 
 	start := time.Now()
-	var updated, failed []string
 
-	for _, item := range items {
-		ReportProgress(ctx, item.Name, PackageStarting)
-		out, err := RunCommandWithLog(ctx, p.logger, "npm", "install", "-g", item.Name+"@latest")
-		if err != nil {
-			p.logf("npm install -g %s@latest error: %v\n%s", item.Name, err, out)
-			failed = append(failed, item.Name)
-			ReportProgress(ctx, item.Name, PackageFailed)
-		} else {
-			updated = append(updated, item.Name)
-			ReportProgress(ctx, item.Name, PackageUpdated)
-		}
+	names := make([]string, len(items))
+	for i, item := range items {
+		names[i] = item.Name
 	}
+
+	// Batch into a single `npm install -g a@latest b@latest …`. Concurrent global
+	// installs can clobber each other's staging directory, so a single invocation
+	// is both faster (one npm startup) and safer than firing parallel processes.
+	updated, failed := BatchUpgrade(ctx, names,
+		func(ctx context.Context, names []string) (string, error) {
+			args := []string{"install", "-g"}
+			for _, n := range names {
+				args = append(args, n+"@latest")
+			}
+			out, err := RunCommandWithLog(ctx, p.logger, "npm", args...)
+			if err != nil {
+				p.logf("npm install -g (batch) error: %v\n%s", err, out)
+			}
+			return out, err
+		},
+		func(ctx context.Context, name string) (string, error) {
+			out, err := RunCommandWithLog(ctx, p.logger, "npm", "install", "-g", name+"@latest")
+			if err != nil {
+				p.logf("npm install -g %s@latest error: %v\n%s", name, err, out)
+			}
+			return out, err
+		},
+	)
 
 	return UpdateResult{
 		Updated:  updated,

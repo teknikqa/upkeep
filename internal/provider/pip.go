@@ -130,7 +130,8 @@ func (p *PipProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 				}
 			}
 		}
-		// Upgrade each outdated package (skip the pipx pseudo-item).
+		// Collect outdated packages (skip the pipx pseudo-item).
+		var pkgNames []string
 		for _, item := range items {
 			if item.Name == "pipx (all packages)" {
 				continue
@@ -140,17 +141,30 @@ func (p *PipProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRe
 				ReportProgress(ctx, item.Name, PackageSkipped)
 				continue
 			}
-			ReportProgress(ctx, item.Name, PackageStarting)
-			out, err := RunCommandWithLog(ctx, p.logger, "pip3", "install", "--upgrade", item.Name)
-			if err != nil {
-				p.logf("pip3 upgrade %s error: %v\n%s", item.Name, err, out)
-				failed = append(failed, item.Name)
-				ReportProgress(ctx, item.Name, PackageFailed)
-			} else {
-				updated = append(updated, item.Name)
-				ReportProgress(ctx, item.Name, PackageUpdated)
-			}
+			pkgNames = append(pkgNames, item.Name)
 		}
+
+		// Batch into a single `pip3 install --upgrade a b c`. Concurrent installs
+		// into the same environment can corrupt shared site-packages, so one
+		// invocation is both faster and safer than parallel processes.
+		pkgUpdated, pkgFailed := BatchUpgrade(ctx, pkgNames,
+			func(ctx context.Context, names []string) (string, error) {
+				out, err := RunCommandWithLog(ctx, p.logger, "pip3", append([]string{"install", "--upgrade"}, names...)...)
+				if err != nil {
+					p.logf("pip3 upgrade (batch) error: %v\n%s", err, out)
+				}
+				return out, err
+			},
+			func(ctx context.Context, name string) (string, error) {
+				out, err := RunCommandWithLog(ctx, p.logger, "pip3", "install", "--upgrade", name)
+				if err != nil {
+					p.logf("pip3 upgrade %s error: %v\n%s", name, err, out)
+				}
+				return out, err
+			},
+		)
+		updated = append(updated, pkgUpdated...)
+		failed = append(failed, pkgFailed...)
 	}
 
 	if p.cfg.Pipx && CommandExists("pipx") {
