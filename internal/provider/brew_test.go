@@ -69,13 +69,14 @@ func TestBrewProvider_Update_Empty(t *testing.T) {
 
 func TestBrewProvider_Update_ItemsAccountedFor(t *testing.T) {
 	p := provider.NewBrewProvider(config.BrewConfig{Enabled: true}, nil)
+	// Use guaranteed-nonexistent formulae so the batch command always fails
+	// (whether or not brew is installed), forcing the per-item fallback to run.
+	// Every item must still be accounted for.
 	items := []provider.OutdatedItem{
-		{Name: "git"},
-		{Name: "jq"},
+		{Name: "brew-nonexistent-formula-aaa"},
+		{Name: "brew-nonexistent-formula-bbb"},
 	}
 	result := p.Update(context.Background(), items)
-	// Without brew installed, commands will fail — items should land in Failed.
-	// Either way, every item must be accounted for.
 	total := len(result.Updated) + len(result.Failed)
 	if total != 2 {
 		t.Errorf("expected 2 items accounted for, got updated=%v failed=%v", result.Updated, result.Failed)

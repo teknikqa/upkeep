@@ -67,6 +67,30 @@ func TestEditorProvider_Timeout(t *testing.T) {
 	_ = result
 }
 
+func TestEditorProvider_Update_ConcurrentSuccessAndFailure(t *testing.T) {
+	if !provider.CommandExistsExport("echo") || !provider.CommandExistsExport("false") {
+		t.Skip("echo and false not both available")
+	}
+
+	// Use real commands as stand-in editors so both goroutine branches run
+	// deterministically: `echo --update-extensions` exits 0 (updated), while
+	// `false --update-extensions` exits 1 (failed). Both run concurrently.
+	p := provider.NewEditorProvider(config.EditorConfig{
+		Enabled: true,
+		Editors: []string{"echo", "false"},
+		Timeout: 5,
+	}, nil)
+
+	result := p.Update(context.Background(), nil)
+
+	if len(result.Updated) != 1 || result.Updated[0] != "echo" {
+		t.Errorf("expected updated=[echo], got %v", result.Updated)
+	}
+	if len(result.Failed) != 1 || result.Failed[0] != "false" {
+		t.Errorf("expected failed=[false], got %v", result.Failed)
+	}
+}
+
 func TestEditorProvider_Registered(t *testing.T) {
 	p, err := provider.GetByName("editor")
 	if err != nil {

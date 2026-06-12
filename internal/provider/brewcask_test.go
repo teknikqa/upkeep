@@ -100,18 +100,19 @@ func TestBrewCaskProvider_Update_DeferStrategy(t *testing.T) {
 		nil,
 	)
 
-	// Pass in items marked manually (no real brew available in tests).
+	// Two guaranteed-nonexistent non-auth casks so the batched `brew upgrade
+	// --cask` always fails and the per-item fallback runs. Every item must still
+	// be accounted for, and Update must not panic.
 	items := []provider.OutdatedItem{
-		{Name: "iterm2", AuthRequired: false},
+		{Name: "brew-nonexistent-cask-aaa", AuthRequired: false},
+		{Name: "brew-nonexistent-cask-bbb", AuthRequired: false},
 	}
 
-	// Without brew, this will fail — but Update should still return a result,
-	// not panic. We mainly test the deferred path doesn't panic.
 	result := p.Update(context.Background(), items)
-	// Either updated or failed — as long as no panic.
 	total := len(result.Updated) + len(result.Failed) + len(result.Deferred) + len(result.Skipped)
-	if total == 0 {
-		t.Error("expected at least one item accounted for in result")
+	if total != 2 {
+		t.Errorf("expected 2 items accounted for, got updated=%v failed=%v deferred=%v skipped=%v",
+			result.Updated, result.Failed, result.Deferred, result.Skipped)
 	}
 }
 
