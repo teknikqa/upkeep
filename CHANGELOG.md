@@ -24,6 +24,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Homebrew formulae and Composer packages are now upgraded one-by-one instead of in a single batch command. The update footer now shows the specific package being updated (e.g. `⏳ Updating: Homebrew Formulae → cryptography`) instead of listing all packages at once.
 - Per-package upgrades isolate failures — one formula failing no longer marks all as failed.
 
+## [0.6.0] - 2026-04-09
+
+### Added
+
+- Update footer now shows the current package name being processed.
+
+### Changed
+
+- Providers are now sorted alphabetically by display name.
+
+### Fixed
+
+- Show package names in the live update table during execution.
+- Pre-cache sudo credentials for force-interactive cask updates so the prompt doesn't interrupt mid-run.
+- Skip pip3 upgrades in PEP 668 externally-managed environments.
+
+## [0.5.0] - 2026-04-08
+
+### Added
+
+- Live per-package progress in the update table.
+
+## [0.4.0] - 2026-04-07
+
+### Added
+
+- Live-updating scan table with per-provider progress.
+- Providers with no outdated packages now show an "up to date" status, and all provider sub-groups are shown at all times in the scan table.
+- Custom error types with improved context-cancellation handling.
+
+### Changed
+
+- Minimum Go version raised to 1.25.
+
+## [0.3.1] - 2026-04-01
+
+### Fixed
+
+- Editor extensions: skip pre-release versions when checking for outdated extensions.
+
+## [0.3.0] - 2026-04-01
+
+### Added
+
+- **Unified live table**: the live update table and final report are merged into a single table, and the progress bar is replaced by a live-updating scan table during updates.
+- Editor extension outdated-version detection via marketplace APIs, with outdated extensions sub-grouped by editor in the scan summary.
+
+### Changed
+
+- Renamed the `vscode` provider to `editor`; its display name is now "Code Editor Extensions".
+
+### Fixed
+
+- Composer: detect pending installs/updates via a dry-run update, and handle bare `[]` JSON when no global packages are installed.
+- Editors are no longer falsely reported as outdated packages.
+- UI: wrap long package lists into continuation rows instead of overflowing, strip trailing padding from table rows, and show all outdated packages in the scan summary.
+
 ## [0.2.0] - 2026-03-31
 
 ### Added
@@ -69,5 +126,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [Unreleased]: https://github.com/teknikqa/upkeep/compare/v0.8.0...HEAD
 [0.8.0]: https://github.com/teknikqa/upkeep/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/teknikqa/upkeep/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/teknikqa/upkeep/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/teknikqa/upkeep/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/teknikqa/upkeep/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/teknikqa/upkeep/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/teknikqa/upkeep/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/teknikqa/upkeep/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/teknikqa/upkeep/releases/tag/v0.1.0
