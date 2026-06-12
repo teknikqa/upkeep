@@ -76,20 +76,32 @@ func (p *BrewProvider) Update(ctx context.Context, items []OutdatedItem) UpdateR
 	}
 
 	start := time.Now()
-	var updated, failed []string
 
-	for _, item := range items {
-		ReportProgress(ctx, item.Name, PackageStarting)
-		output, err := RunCommandWithLog(ctx, p.logger, "brew", "upgrade", "--quiet", item.Name)
-		if err != nil {
-			p.logf("brew upgrade %s error: %v\n%s", item.Name, err, output)
-			failed = append(failed, item.Name)
-			ReportProgress(ctx, item.Name, PackageFailed)
-		} else {
-			updated = append(updated, item.Name)
-			ReportProgress(ctx, item.Name, PackageUpdated)
-		}
+	names := make([]string, len(items))
+	for i, item := range items {
+		names[i] = item.Name
 	}
+
+	// Homebrew serializes itself with a global lock, so concurrent `brew upgrade`
+	// processes can't run. Batch all formulae into one invocation instead — a
+	// single lock acquisition and Ruby startup, with brew fetching bottles
+	// concurrently internally.
+	updated, failed := BatchUpgrade(ctx, names,
+		func(ctx context.Context, names []string) (string, error) {
+			out, err := RunCommandWithLog(ctx, p.logger, "brew", append([]string{"upgrade", "--quiet"}, names...)...)
+			if err != nil {
+				p.logf("brew upgrade (batch) error: %v\n%s", err, out)
+			}
+			return out, err
+		},
+		func(ctx context.Context, name string) (string, error) {
+			out, err := RunCommandWithLog(ctx, p.logger, "brew", "upgrade", "--quiet", name)
+			if err != nil {
+				p.logf("brew upgrade %s error: %v\n%s", name, err, out)
+			}
+			return out, err
+		},
+	)
 
 	// Run post-hooks from config.
 	for _, hook := range p.cfg.PostHooks {

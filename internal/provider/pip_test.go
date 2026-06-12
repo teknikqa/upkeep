@@ -312,3 +312,33 @@ func TestPipProvider_Update_ExternallyManaged_PipxStillRuns(t *testing.T) {
 		t.Error("expected pipx-packages in updated or failed, but not found — pipx path was skipped")
 	}
 }
+
+func TestPipProvider_Update_NotExternallyManaged_BatchesPackages(t *testing.T) {
+	if !provider.CommandExistsExport("pip3") {
+		t.Skip("pip3 not available")
+	}
+
+	p := provider.NewPipProvider(config.PipConfig{
+		Enabled: true,
+		// Disable pip/setuptools/pipx so only the outdated-package batch path runs.
+		UpgradePip:        false,
+		UpgradeSetuptools: false,
+		Pipx:              false,
+	}, nil)
+	p.SetCheckExternallyManaged(func(_ context.Context) bool { return false })
+
+	items := []provider.OutdatedItem{
+		{Name: "pip-nonexistent-pkg-aaa"},
+		{Name: "pip-nonexistent-pkg-bbb"},
+	}
+	// The fake packages can't be installed, so the batch and per-item fallback
+	// both fail — but every item must be accounted for as failed (not skipped).
+	result := p.Update(context.Background(), items)
+	if len(result.Skipped) != 0 {
+		t.Errorf("expected 0 skipped when not externally-managed, got %v", result.Skipped)
+	}
+	total := len(result.Updated) + len(result.Failed)
+	if total != 2 {
+		t.Errorf("expected 2 items accounted for, got updated=%v failed=%v", result.Updated, result.Failed)
+	}
+}

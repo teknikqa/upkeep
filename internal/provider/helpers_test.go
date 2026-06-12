@@ -3,6 +3,7 @@ package provider_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"strings"
@@ -307,4 +308,129 @@ func TestReportProgress_WithFunc(t *testing.T) {
 func TestReportProgress_WithoutFunc(t *testing.T) {
 	// Should not panic when no ProgressFunc is set.
 	provider.ReportProgress(context.Background(), "pkg", provider.PackageUpdated)
+}
+
+// --- BatchUpgrade ---
+
+func TestBatchUpgrade_Empty(t *testing.T) {
+	updated, failed := provider.BatchUpgrade(context.Background(), nil,
+		func(context.Context, []string) (string, error) {
+			t.Fatal("batch should not run for empty input")
+			return "", nil
+		},
+		func(context.Context, string) (string, error) {
+			t.Fatal("one should not run for empty input")
+			return "", nil
+		},
+	)
+	if len(updated) != 0 || len(failed) != 0 {
+		t.Errorf("expected no results, got updated=%v failed=%v", updated, failed)
+	}
+}
+
+func TestBatchUpgrade_SingleSuccess(t *testing.T) {
+	var batchCalls, oneCalls int
+	updated, failed := provider.BatchUpgrade(context.Background(), []string{"pkg"},
+		func(context.Context, []string) (string, error) { batchCalls++; return "", nil },
+		func(context.Context, string) (string, error) { oneCalls++; return "", nil },
+	)
+	// A single package skips the batch command and runs directly.
+	if batchCalls != 0 {
+		t.Errorf("expected batch not called for single item, got %d", batchCalls)
+	}
+	if oneCalls != 1 {
+		t.Errorf("expected one called once, got %d", oneCalls)
+	}
+	if len(updated) != 1 || updated[0] != "pkg" || len(failed) != 0 {
+		t.Errorf("expected updated=[pkg], got updated=%v failed=%v", updated, failed)
+	}
+}
+
+func TestBatchUpgrade_SingleFailure(t *testing.T) {
+	updated, failed := provider.BatchUpgrade(context.Background(), []string{"pkg"},
+		func(context.Context, []string) (string, error) { return "", errors.New("nope") },
+		func(context.Context, string) (string, error) { return "", errors.New("nope") },
+	)
+	if len(updated) != 0 || len(failed) != 1 || failed[0] != "pkg" {
+		t.Errorf("expected failed=[pkg], got updated=%v failed=%v", updated, failed)
+	}
+}
+
+func TestBatchUpgrade_BatchSuccess(t *testing.T) {
+	var oneCalls int
+	names := []string{"a", "b", "c"}
+	updated, failed := provider.BatchUpgrade(context.Background(), names,
+		func(_ context.Context, n []string) (string, error) {
+			if len(n) != 3 {
+				t.Errorf("expected 3 names in batch, got %v", n)
+			}
+			return "", nil
+		},
+		func(context.Context, string) (string, error) { oneCalls++; return "", nil },
+	)
+	if oneCalls != 0 {
+		t.Errorf("expected no per-item calls on batch success, got %d", oneCalls)
+	}
+	if len(updated) != 3 || len(failed) != 0 {
+		t.Errorf("expected all 3 updated, got updated=%v failed=%v", updated, failed)
+	}
+}
+
+func TestBatchUpgrade_BatchFailureFallsBackPerItem(t *testing.T) {
+	// Batch fails, so each package is retried individually; "b" keeps failing.
+	var oneCalls int
+	updated, failed := provider.BatchUpgrade(context.Background(), []string{"a", "b", "c"},
+		func(context.Context, []string) (string, error) { return "", errors.New("batch failed") },
+		func(_ context.Context, name string) (string, error) {
+			oneCalls++
+			if name == "b" {
+				return "", errors.New("b failed")
+			}
+			return "", nil
+		},
+	)
+	if oneCalls != 3 {
+		t.Errorf("expected 3 fallback calls, got %d", oneCalls)
+	}
+	if len(updated) != 2 || updated[0] != "a" || updated[1] != "c" {
+		t.Errorf("expected updated=[a c], got %v", updated)
+	}
+	if len(failed) != 1 || failed[0] != "b" {
+		t.Errorf("expected failed=[b], got %v", failed)
+	}
+}
+
+func TestBatchUpgrade_ReportsStartingThenTerminal(t *testing.T) {
+	events := map[string][]provider.PackageStatus{}
+	ctx := provider.ContextWithProgress(context.Background(), func(p provider.PackageProgress) {
+		events[p.Name] = append(events[p.Name], p.Status)
+	})
+
+	provider.BatchUpgrade(ctx, []string{"a", "b"},
+		func(context.Context, []string) (string, error) { return "", errors.New("fail") },
+		func(_ context.Context, name string) (string, error) {
+			if name == "b" {
+				return "", errors.New("b fails")
+			}
+			return "", nil
+		},
+	)
+
+	// Every package reports Starting first, then a terminal status.
+	want := map[string]provider.PackageStatus{
+		"a": provider.PackageUpdated,
+		"b": provider.PackageFailed,
+	}
+	for name, terminal := range want {
+		got := events[name]
+		if len(got) < 2 {
+			t.Fatalf("%s: expected at least 2 events, got %v", name, got)
+		}
+		if got[0] != provider.PackageStarting {
+			t.Errorf("%s: expected first event Starting, got %s", name, got[0])
+		}
+		if got[len(got)-1] != terminal {
+			t.Errorf("%s: expected terminal %s, got %s", name, terminal, got[len(got)-1])
+		}
+	}
 }

@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/teknikqa/upkeep/internal/config"
@@ -142,27 +143,41 @@ func (p *EditorProvider) Update(ctx context.Context, _ []OutdatedItem) UpdateRes
 		timeoutSecs = 300
 	}
 
+	// Each editor is a separate binary updating its own extensions directory, so
+	// unlike Homebrew there's no shared lock — run them concurrently. Results are
+	// collected under a mutex; the live table's progress callback is already
+	// concurrency-safe.
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 	for _, editor := range editors {
 		if !CommandExists(editor) {
 			continue
 		}
-		ReportProgress(ctx, editor, PackageStarting)
-		editorCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSecs)*time.Second)
-		out, err := RunCommandWithLog(editorCtx, p.logger, editor, "--update-extensions")
-		cancel()
-		if err != nil {
-			if editorCtx.Err() == context.DeadlineExceeded {
-				p.logf("%s --update-extensions timed out after %ds", editor, timeoutSecs)
+		wg.Add(1)
+		go func(editor string) {
+			defer wg.Done()
+			ReportProgress(ctx, editor, PackageStarting)
+			editorCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSecs)*time.Second)
+			out, err := RunCommandWithLog(editorCtx, p.logger, editor, "--update-extensions")
+			cancel()
+
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				if editorCtx.Err() == context.DeadlineExceeded {
+					p.logf("%s --update-extensions timed out after %ds", editor, timeoutSecs)
+				} else {
+					p.logf("%s --update-extensions error: %v\n%s", editor, err, out)
+				}
+				failed = append(failed, editor)
+				ReportProgress(ctx, editor, PackageFailed)
 			} else {
-				p.logf("%s --update-extensions error: %v\n%s", editor, err, out)
+				updated = append(updated, editor)
+				ReportProgress(ctx, editor, PackageUpdated)
 			}
-			failed = append(failed, editor)
-			ReportProgress(ctx, editor, PackageFailed)
-		} else {
-			updated = append(updated, editor)
-			ReportProgress(ctx, editor, PackageUpdated)
-		}
+		}(editor)
 	}
+	wg.Wait()
 
 	return UpdateResult{
 		Updated:  updated,

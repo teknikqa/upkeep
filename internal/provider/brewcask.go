@@ -107,20 +107,31 @@ func (p *BrewCaskProvider) Update(ctx context.Context, items []OutdatedItem) Upd
 		}
 	}
 
-	// Update non-auth casks with NONINTERACTIVE=1.
-	for _, item := range noAuth {
-		ReportProgress(ctx, item.Name, PackageStarting)
-		env := []string{"NONINTERACTIVE=1"}
-		out, err := RunCommandEnvWithLog(ctx, p.logger, env, "brew", "upgrade", "--cask", item.Name)
-		if err != nil {
-			p.logf("brew upgrade --cask %s error: %v\n%s", item.Name, err, out)
-			failed = append(failed, item.Name)
-			ReportProgress(ctx, item.Name, PackageFailed)
-		} else {
-			updated = append(updated, item.Name)
-			ReportProgress(ctx, item.Name, PackageUpdated)
-		}
+	// Update non-auth casks with NONINTERACTIVE=1. Homebrew's global lock rules
+	// out concurrent processes, so batch them into one invocation instead.
+	env := []string{"NONINTERACTIVE=1"}
+	noAuthNames := make([]string, len(noAuth))
+	for i, item := range noAuth {
+		noAuthNames[i] = item.Name
 	}
+	noAuthUpdated, noAuthFailed := BatchUpgrade(ctx, noAuthNames,
+		func(ctx context.Context, names []string) (string, error) {
+			out, err := RunCommandEnvWithLog(ctx, p.logger, env, "brew", append([]string{"upgrade", "--cask"}, names...)...)
+			if err != nil {
+				p.logf("brew upgrade --cask (batch) error: %v\n%s", err, out)
+			}
+			return out, err
+		},
+		func(ctx context.Context, name string) (string, error) {
+			out, err := RunCommandEnvWithLog(ctx, p.logger, env, "brew", "upgrade", "--cask", name)
+			if err != nil {
+				p.logf("brew upgrade --cask %s error: %v\n%s", name, err, out)
+			}
+			return out, err
+		},
+	)
+	updated = append(updated, noAuthUpdated...)
+	failed = append(failed, noAuthFailed...)
 
 	// Handle auth-required casks per strategy.
 	switch p.cfg.AuthStrategy {

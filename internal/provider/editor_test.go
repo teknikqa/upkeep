@@ -2,6 +2,8 @@ package provider_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -41,30 +43,66 @@ func TestEditorProvider_Scan_NoEditors(t *testing.T) {
 }
 
 func TestEditorProvider_Timeout(t *testing.T) {
-	// Verify timeout is respected: run `sleep` as the "editor".
-	// This tests that the per-editor context deadline fires.
-	// Only run on systems where sleep is available.
-	if !provider.CommandExistsExport("sleep") {
-		t.Skip("sleep not available")
+	if !provider.CommandExistsExport("sh") {
+		t.Skip("sh not available")
+	}
+
+	// Create an executable that ignores its args and sleeps far longer than the
+	// timeout, so the per-editor context deadline actually fires (covering the
+	// DeadlineExceeded branch). An absolute path is resolved directly by
+	// exec.LookPath, so it doesn't need to be on PATH.
+	dir := t.TempDir()
+	script := filepath.Join(dir, "slow-editor")
+	// `exec` so the shell is replaced by sleep (same PID the context tracks),
+	// otherwise killing sh would orphan sleep and Wait would block on the
+	// inherited output pipe until the full sleep elapsed.
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nexec sleep 30\n"), 0o755); err != nil {
+		t.Fatalf("writing script: %v", err)
 	}
 
 	p := provider.NewEditorProvider(config.EditorConfig{
 		Enabled: true,
-		Editors: []string{"sleep"},
+		Editors: []string{script},
 		Timeout: 1,
 	}, nil)
 
-	items := []provider.OutdatedItem{{Name: "sleep", LatestVersion: "1 extension"}}
 	start := time.Now()
-	result := p.Update(context.Background(), items)
+	result := p.Update(context.Background(), nil)
 	elapsed := time.Since(start)
 
-	// sleep with no args exits quickly (error), but we're testing timeout logic.
-	// The important thing: it should not take more than ~3s.
+	// The 1s deadline should cancel the 30s sleep well before it completes.
 	if elapsed > 5*time.Second {
-		t.Errorf("update took too long: %v", elapsed)
+		t.Errorf("update should have timed out quickly, took %v", elapsed)
 	}
-	_ = result
+	if len(result.Failed) != 1 || result.Failed[0] != script {
+		t.Errorf("expected timed-out editor in failed, got failed=%v updated=%v", result.Failed, result.Updated)
+	}
+}
+
+func TestEditorProvider_Update_ConcurrentSuccessAndFailure(t *testing.T) {
+	if !provider.CommandExistsExport("echo") || !provider.CommandExistsExport("false") {
+		t.Skip("echo and false not both available")
+	}
+
+	// Use real commands as stand-in editors so both goroutine branches run
+	// deterministically: `echo --update-extensions` exits 0 (updated), while
+	// `false --update-extensions` exits 1 (failed). Both run concurrently.
+	// The nonexistent editor is skipped (CommandExists → continue); echo and
+	// false exercise the success and failure goroutine branches concurrently.
+	p := provider.NewEditorProvider(config.EditorConfig{
+		Enabled: true,
+		Editors: []string{"nonexistent-editor-xyz-abc", "echo", "false"},
+		Timeout: 5,
+	}, nil)
+
+	result := p.Update(context.Background(), nil)
+
+	if len(result.Updated) != 1 || result.Updated[0] != "echo" {
+		t.Errorf("expected updated=[echo], got %v", result.Updated)
+	}
+	if len(result.Failed) != 1 || result.Failed[0] != "false" {
+		t.Errorf("expected failed=[false], got %v", result.Failed)
+	}
 }
 
 func TestEditorProvider_Registered(t *testing.T) {

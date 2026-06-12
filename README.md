@@ -15,6 +15,7 @@ A Go CLI tool that keeps your macOS development environment up to date.
 - **10 providers**: Homebrew formulae, Homebrew casks, npm, Composer, pip, Rust, VS Code extensions, Oh My Zsh, Vim, Vagrant
 - **Scan → Confirm → Execute → Report pipeline** with pterm TUI output
 - **Parallel execution** with configurable parallelism and dependency ordering (brew-cask waits for brew)
+- **Batched upgrades**: package managers that accept multiple packages (Homebrew, npm, pip) upgrade everything in a single command — faster, and the only way to parallelize Homebrew, whose global lock blocks concurrent processes. A failing batch automatically re-runs each package individually so failures stay isolated. Editor extensions update concurrently across editors.
 - **Auth-required cask partitioning**: detects which casks need admin auth via dry-run probe + heuristic fallback; defers them to a separate script
 - **Resumability**: JSON state file tracks last-run results; `--retry-failed` re-runs only failed providers
 - **Deferred cask script**: `--run-deferred` executes the generated script for auth-required casks
