@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-12
+
 ### Changed
 
 - **Faster updates via batching.** Homebrew formulae, Homebrew casks (non-auth), npm global packages, and pip packages are now upgraded in a single batched command per provider instead of one-by-one. This is both faster (one process startup, with the package manager fetching downloads concurrently internally) and, for Homebrew specifically, the only way to parallelize — concurrent `brew` processes contend on Homebrew's global lock and cannot run simultaneously. Batching is also safer than firing concurrent `npm install -g` / `pip install` processes, which can corrupt shared install directories.
@@ -64,7 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release**: GoReleaser for macOS amd64 + arm64 binaries
 - **Dependabot**: Weekly updates for Go modules and GitHub Actions
 
-[Unreleased]: https://github.com/teknikqa/upkeep/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/teknikqa/upkeep/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/teknikqa/upkeep/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/teknikqa/upkeep/compare/v0.6.0...v0.7.0
 [0.2.0]: https://github.com/teknikqa/upkeep/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/teknikqa/upkeep/releases/tag/v0.1.0
