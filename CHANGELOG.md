@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-23
+
+### Fixed
+
+- The live update table no longer lists the package currently being updated inside its `Remaining:` segment. The in-progress package now appears in its own `Updating:` segment (e.g. `Updating: vivaldi | Remaining: chatgpt, ...`), matching the active-package footer, and already-updated packages are shown first.
+
 ## [0.8.0] - 2026-06-12
 
 ### Changed
@@ -123,7 +129,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release**: GoReleaser for macOS amd64 + arm64 binaries
 - **Dependabot**: Weekly updates for Go modules and GitHub Actions
 
-[Unreleased]: https://github.com/teknikqa/upkeep/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/teknikqa/upkeep/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/teknikqa/upkeep/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/teknikqa/upkeep/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/teknikqa/upkeep/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/teknikqa/upkeep/compare/v0.5.0...v0.6.0
