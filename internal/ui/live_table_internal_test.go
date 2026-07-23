@@ -301,6 +301,7 @@ func TestFormatUpdatingPackages(t *testing.T) {
 		name      string
 		completed []string
 		all       []string
+		current   string
 		maxWidth  int
 		want      []string
 	}{
@@ -310,6 +311,30 @@ func TestFormatUpdatingPackages(t *testing.T) {
 			all:       []string{"chatgpt", "codex", "codex-app", "cursor"},
 			maxWidth:  200,
 			want:      []string{"chatgpt, codex | Remaining: codex-app, cursor"},
+		},
+		{
+			name:      "current splits into its own updating segment",
+			completed: []string{"chatgpt", "codex"},
+			all:       []string{"chatgpt", "codex", "codex-app", "cursor"},
+			current:   "codex-app",
+			maxWidth:  200,
+			want:      []string{"chatgpt, codex | Updating: codex-app | Remaining: cursor"},
+		},
+		{
+			name:      "nothing completed, current is first",
+			completed: nil,
+			all:       []string{"a", "b", "c"},
+			current:   "a",
+			maxWidth:  200,
+			want:      []string{"Updating: a | Remaining: b, c"},
+		},
+		{
+			name:      "current is the last remaining package",
+			completed: []string{"a", "b"},
+			all:       []string{"a", "b", "c"},
+			current:   "c",
+			maxWidth:  200,
+			want:      []string{"a, b | Updating: c"},
 		},
 		{
 			name:      "split when too narrow to merge",
@@ -343,7 +368,7 @@ func TestFormatUpdatingPackages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := formatUpdatingPackages(tt.completed, tt.all, tt.maxWidth)
+			got := formatUpdatingPackages(tt.completed, tt.all, tt.current, tt.maxWidth)
 			if len(got) != len(tt.want) {
 				t.Fatalf("expected %d lines, got %d: %#v", len(tt.want), len(got), got)
 			}
@@ -624,8 +649,13 @@ func TestRenderTableContent_UpdatingProvider(t *testing.T) {
 	if content == "" {
 		t.Fatal("expected non-empty rendered content")
 	}
-	if !contains(content, "Remaining: codex-app") {
-		t.Errorf("expected 'Remaining: codex-app' in content, got:\n%s", content)
+	// codex-app is the actively-updating package, so it gets its own
+	// "Updating:" segment and cursor is the sole remaining package.
+	if !contains(content, "Updating: codex-app") {
+		t.Errorf("expected 'Updating: codex-app' in content, got:\n%s", content)
+	}
+	if !contains(content, "Remaining: cursor") {
+		t.Errorf("expected 'Remaining: cursor' in content, got:\n%s", content)
 	}
 	if !contains(content, "chatgpt, codex") {
 		t.Errorf("expected 'chatgpt, codex' (done list) in content, got:\n%s", content)

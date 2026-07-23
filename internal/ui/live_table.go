@@ -280,8 +280,9 @@ type updateTableRow struct {
 	fail        string
 	dur         string
 	packages    []string
-	updating    bool     // when true, render packages as "done | Remaining: rest"
+	updating    bool     // when true, render packages as "done | Updating: cur | Remaining: rest"
 	allPackages []string // full scan-time package list (only used when updating)
+	currentPkg  string   // package currently being processed (only used when updating)
 }
 
 // buildUpdateTableRows converts the provider scan rows and live state into
@@ -322,6 +323,7 @@ func (t *LiveUpdateTable) buildUpdateTableRows() []updateTableRow {
 			ir.updating = true
 			ir.packages = s.packages
 			ir.allPackages = r.Packages
+			ir.currentPkg = s.currentPkg
 		}
 		rows = append(rows, ir)
 	}
@@ -385,7 +387,7 @@ func buildTableData(rows []updateTableRow, maxPkgWidth int) pterm.TableData {
 	for _, ir := range rows {
 		var pkgLines []string
 		if ir.updating {
-			pkgLines = formatUpdatingPackages(ir.packages, ir.allPackages, maxPkgWidth)
+			pkgLines = formatUpdatingPackages(ir.packages, ir.allPackages, ir.currentPkg, maxPkgWidth)
 		} else {
 			pkgLines = WrapPackages(ir.packages, maxPkgWidth)
 		}
@@ -573,50 +575,69 @@ func (t *LiveUpdateTable) displayNameFor(name string) string {
 }
 
 // formatUpdatingPackages renders the Packages column for a provider whose
-// status is "updating". It shows completed package names followed by a
-// "Remaining: ..." segment listing scan-time packages not yet processed.
-// When the last completed line plus " | Remaining: <first>" fits within
-// maxWidth, they are joined on the same line.
-func formatUpdatingPackages(completed, all []string, maxWidth int) []string {
+// status is "updating". It shows, in order, the completed package names, an
+// "Updating: <current>" segment for the package currently being processed, and
+// a "Remaining: ..." segment listing scan-time packages not yet started. The
+// currently-updating package is excluded from the remaining list. Adjacent
+// segments are merged onto one line (joined with " | ") whenever they fit
+// within maxWidth.
+func formatUpdatingPackages(completed, all []string, current string, maxWidth int) []string {
 	done := make(map[string]struct{}, len(completed))
 	for _, p := range completed {
 		done[p] = struct{}{}
 	}
 	var remaining []string
 	for _, p := range all {
-		if _, ok := done[p]; !ok {
-			remaining = append(remaining, p)
+		if _, ok := done[p]; ok {
+			continue
+		}
+		if p == current {
+			continue // shown in its own "Updating:" segment
+		}
+		remaining = append(remaining, p)
+	}
+
+	// Build labeled segments in display order: completed, Updating, Remaining.
+	var segments [][]string
+	if len(completed) > 0 {
+		segments = append(segments, completed)
+	}
+	if current != "" {
+		segments = append(segments, []string{"Updating: " + current})
+	}
+	if len(remaining) > 0 {
+		remList := make([]string, len(remaining))
+		remList[0] = "Remaining: " + remaining[0]
+		copy(remList[1:], remaining[1:])
+		segments = append(segments, remList)
+	}
+
+	if len(segments) == 0 {
+		return []string{"-"}
+	}
+	return joinPackageSegments(segments, maxWidth)
+}
+
+// joinPackageSegments wraps each segment via WrapPackages and concatenates the
+// resulting line groups, merging a segment's first line onto the previous
+// segment's last line (joined with " | ") when the combined line fits maxWidth.
+func joinPackageSegments(segments [][]string, maxWidth int) []string {
+	var lines []string
+	for _, seg := range segments {
+		segLines := WrapPackages(seg, maxWidth)
+		if len(lines) == 0 {
+			lines = segLines
+			continue
+		}
+		merged := lines[len(lines)-1] + " | " + segLines[0]
+		if len(merged) <= maxWidth {
+			lines[len(lines)-1] = merged
+			lines = append(lines, segLines[1:]...)
+		} else {
+			lines = append(lines, segLines...)
 		}
 	}
-
-	switch {
-	case len(completed) == 0 && len(remaining) == 0:
-		return []string{"-"}
-	case len(remaining) == 0:
-		return WrapPackages(completed, maxWidth)
-	}
-
-	remList := make([]string, len(remaining))
-	remList[0] = "Remaining: " + remaining[0]
-	copy(remList[1:], remaining[1:])
-
-	if len(completed) == 0 {
-		return WrapPackages(remList, maxWidth)
-	}
-
-	doneLines := WrapPackages(completed, maxWidth)
-	remLines := WrapPackages(remList, maxWidth)
-
-	// If the last done line + " | " + first remaining line fits, merge them.
-	lastDone := doneLines[len(doneLines)-1]
-	firstRem := remLines[0]
-	merged := lastDone + " | " + firstRem
-	if len(merged) <= maxWidth {
-		doneLines[len(doneLines)-1] = merged
-		return append(doneLines, remLines[1:]...)
-	}
-
-	return append(doneLines, remLines...)
+	return lines
 }
 
 // buildFinalPackages combines all outcome lists from an UpdateResult into a
