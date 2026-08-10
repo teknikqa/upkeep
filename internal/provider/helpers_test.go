@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -230,6 +231,151 @@ func TestRunCommandEnvWithLog_CapturesOutput(t *testing.T) {
 	}
 }
 
+// --- RunCommandStreamWithLog / RunCommandEnvStreamWithLog ---
+
+func TestRunCommandStreamWithLog_InvokesOnLinePerLine(t *testing.T) {
+	var lines []string
+	out, err := provider.RunCommandStreamWithLog(context.Background(), nil, func(line string) {
+		lines = append(lines, line)
+	}, "sh", "-c", "echo one; echo two")
+	if err != nil {
+		t.Fatalf("RunCommandStreamWithLog: %v", err)
+	}
+	if want := []string{"one", "two"}; !slices.Equal(lines, want) {
+		t.Errorf("expected onLine calls %v, got %v", want, lines)
+	}
+	if !strings.Contains(out, "one") || !strings.Contains(out, "two") {
+		t.Errorf("expected combined output to contain both lines, got %q", out)
+	}
+}
+
+func TestRunCommandStreamWithLog_CapturesOutputAndLogs(t *testing.T) {
+	dir := t.TempDir()
+	logger := logging.New(dir, logging.LevelInfo)
+	defer logger.Close()
+
+	var lines []string
+	out, err := provider.RunCommandStreamWithLog(context.Background(), logger, func(line string) {
+		lines = append(lines, line)
+	}, "echo", "logged-and-streamed")
+	if err != nil {
+		t.Fatalf("RunCommandStreamWithLog: %v", err)
+	}
+	if want := []string{"logged-and-streamed"}; !slices.Equal(lines, want) {
+		t.Errorf("expected onLine calls %v, got %v", want, lines)
+	}
+	if !strings.Contains(out, "logged-and-streamed") {
+		t.Errorf("expected return value to contain 'logged-and-streamed', got %q", out)
+	}
+
+	logPath := logger.CurrentLogPath()
+	data, readErr := os.ReadFile(logPath)
+	if readErr != nil {
+		t.Fatalf("reading log file: %v", readErr)
+	}
+	if !strings.Contains(string(data), "logged-and-streamed") {
+		t.Errorf("expected log file to contain 'logged-and-streamed', got %q", string(data))
+	}
+}
+
+func TestRunCommandStreamWithLog_TeesVerboseOutput(t *testing.T) {
+	var verboseBuf bytes.Buffer
+	provider.SetVerboseOutput(&verboseBuf)
+	t.Cleanup(func() { provider.SetVerboseOutput(nil) })
+
+	var lines []string
+	_, err := provider.RunCommandStreamWithLog(context.Background(), nil, func(line string) {
+		lines = append(lines, line)
+	}, "echo", "verbose-streamed")
+	if err != nil {
+		t.Fatalf("RunCommandStreamWithLog: %v", err)
+	}
+	if want := []string{"verbose-streamed"}; !slices.Equal(lines, want) {
+		t.Errorf("expected onLine calls %v, got %v", want, lines)
+	}
+	if !strings.Contains(verboseBuf.String(), "verbose-streamed") {
+		t.Errorf("expected verbose buffer to contain 'verbose-streamed', got %q", verboseBuf.String())
+	}
+}
+
+func TestRunCommandStreamWithLog_NilOnLine(t *testing.T) {
+	// Should not panic when onLine is nil.
+	out, err := provider.RunCommandStreamWithLog(context.Background(), nil, nil, "echo", "no-callback")
+	if err != nil {
+		t.Fatalf("RunCommandStreamWithLog(nil onLine): %v", err)
+	}
+	if !strings.Contains(out, "no-callback") {
+		t.Errorf("expected stdout to contain 'no-callback', got %q", out)
+	}
+}
+
+func TestRunCommandEnvStreamWithLog_InvokesOnLinePerLine(t *testing.T) {
+	var lines []string
+	out, err := provider.RunCommandEnvStreamWithLog(context.Background(), nil, []string{"UPKEEP_TEST_VAR=env-streamed"}, func(line string) {
+		lines = append(lines, line)
+	}, "sh", "-c", "echo $UPKEEP_TEST_VAR")
+	if err != nil {
+		t.Fatalf("RunCommandEnvStreamWithLog: %v", err)
+	}
+	if want := []string{"env-streamed"}; !slices.Equal(lines, want) {
+		t.Errorf("expected onLine calls %v, got %v", want, lines)
+	}
+	if !strings.Contains(out, "env-streamed") {
+		t.Errorf("expected combined output to contain 'env-streamed', got %q", out)
+	}
+}
+
+// --- OnUpgradeProgressLine ---
+
+func TestOnUpgradeProgressLine_MatchesTrackedName(t *testing.T) {
+	var events []provider.PackageProgress
+	ctx := provider.ContextWithProgress(context.Background(), func(p provider.PackageProgress) {
+		events = append(events, p)
+	})
+
+	onLine := provider.OnUpgradeProgressLine(ctx, map[string]bool{"git": true, "jq": true})
+	onLine("==> Upgrading git")
+
+	want := []provider.PackageProgress{{Name: "git", Status: provider.PackageStarting}}
+	if !slices.Equal(events, want) {
+		t.Errorf("expected events %v, got %v", want, events)
+	}
+}
+
+func TestOnUpgradeProgressLine_IgnoresUntrackedName(t *testing.T) {
+	var events []provider.PackageProgress
+	ctx := provider.ContextWithProgress(context.Background(), func(p provider.PackageProgress) {
+		events = append(events, p)
+	})
+
+	// "wget" is being upgraded as an auto-pulled dependent, not one of the
+	// packages we're tracking in this batch — should be ignored.
+	onLine := provider.OnUpgradeProgressLine(ctx, map[string]bool{"git": true})
+	onLine("==> Upgrading wget")
+
+	if len(events) != 0 {
+		t.Errorf("expected no events for untracked name, got %v", events)
+	}
+}
+
+func TestOnUpgradeProgressLine_IgnoresNonMatchingLines(t *testing.T) {
+	var events []provider.PackageProgress
+	ctx := provider.ContextWithProgress(context.Background(), func(p provider.PackageProgress) {
+		events = append(events, p)
+	})
+
+	onLine := provider.OnUpgradeProgressLine(ctx, map[string]bool{"git": true})
+	// Homebrew's own summary header shares the "==> Upgrading " prefix but
+	// isn't a package name; other unrelated lines shouldn't match either.
+	onLine("==> Upgrading 1 outdated package")
+	onLine("==> Fetching git")
+	onLine("some other output")
+
+	if len(events) != 0 {
+		t.Errorf("expected no events for non-matching lines, got %v", events)
+	}
+}
+
 // --- RunCommandVerbose ---
 
 func TestRunCommandVerbose_TeesOutput(t *testing.T) {
@@ -373,6 +519,50 @@ func TestBatchUpgrade_BatchSuccess(t *testing.T) {
 	}
 	if len(updated) != 3 || len(failed) != 0 {
 		t.Errorf("expected all 3 updated, got updated=%v failed=%v", updated, failed)
+	}
+}
+
+// TestBatchUpgrade_BatchClosureOwnsStartingReports verifies that on the
+// batched fast path, BatchUpgrade itself does not pre-emit PackageStarting —
+// that's left to the batch closure (e.g. by parsing live command output), so
+// it can reflect real per-package progress instead of firing for everything
+// before the batch command even runs.
+func TestBatchUpgrade_BatchClosureOwnsStartingReports(t *testing.T) {
+	var events []provider.PackageProgress
+	ctx := provider.ContextWithProgress(context.Background(), func(p provider.PackageProgress) {
+		events = append(events, p)
+	})
+
+	names := []string{"a", "b", "c"}
+	updated, failed := provider.BatchUpgrade(ctx, names,
+		func(ctx context.Context, names []string) (string, error) {
+			// Simulate the closure observing real progress from streamed
+			// command output, one name at a time, in order.
+			for _, n := range names {
+				provider.ReportProgress(ctx, n, provider.PackageStarting)
+			}
+			return "", nil
+		},
+		func(context.Context, string) (string, error) { return "", nil },
+	)
+	if len(updated) != 3 || len(failed) != 0 {
+		t.Fatalf("expected all 3 updated, got updated=%v failed=%v", updated, failed)
+	}
+
+	// Expect exactly: Starting(a), Starting(b), Starting(c), Updated(a),
+	// Updated(b), Updated(c) — Starting comes only from the closure, in the
+	// order it reported them, and BatchUpgrade's own Updated reports follow
+	// afterwards rather than being interleaved per name.
+	want := []provider.PackageProgress{
+		{Name: "a", Status: provider.PackageStarting},
+		{Name: "b", Status: provider.PackageStarting},
+		{Name: "c", Status: provider.PackageStarting},
+		{Name: "a", Status: provider.PackageUpdated},
+		{Name: "b", Status: provider.PackageUpdated},
+		{Name: "c", Status: provider.PackageUpdated},
+	}
+	if !slices.Equal(events, want) {
+		t.Errorf("expected events %v, got %v", want, events)
 	}
 }
 

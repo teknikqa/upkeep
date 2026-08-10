@@ -85,10 +85,17 @@ func (p *BrewProvider) Update(ctx context.Context, items []OutdatedItem) UpdateR
 	// Homebrew serializes itself with a global lock, so concurrent `brew upgrade`
 	// processes can't run. Batch all formulae into one invocation instead — a
 	// single lock acquisition and Ruby startup, with brew fetching bottles
-	// concurrently internally.
+	// concurrently internally. To still surface accurate per-package progress,
+	// stream the batch command's output and watch for Homebrew's own
+	// "==> Upgrading <name>" progress lines (printed regardless of --quiet).
+	tracked := make(map[string]bool, len(names))
+	for _, n := range names {
+		tracked[n] = true
+	}
 	updated, failed := BatchUpgrade(ctx, names,
 		func(ctx context.Context, names []string) (string, error) {
-			out, err := RunCommandWithLog(ctx, p.logger, "brew", append([]string{"upgrade", "--quiet"}, names...)...)
+			onLine := OnUpgradeProgressLine(ctx, tracked)
+			out, err := RunCommandStreamWithLog(ctx, p.logger, onLine, "brew", append([]string{"upgrade", "--quiet"}, names...)...)
 			if err != nil {
 				p.logf("brew upgrade (batch) error: %v\n%s", err, out)
 			}
