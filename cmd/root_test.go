@@ -32,6 +32,22 @@ func makeProviders(names ...string) []provider.Provider {
 	return ps
 }
 
+// --- rootCmd.Args ---
+
+// TestRootCmd_AcceptsProviderPositionalArgs guards against a regression where
+// cobra's default Args validator (legacyArgs) rejects positional args once
+// any subcommand is registered (config, completion, help) — turning the
+// documented "upkeep brew npm" usage into an "unknown command" error even
+// though runUpdate already reads args as a provider name filter.
+func TestRootCmd_AcceptsProviderPositionalArgs(t *testing.T) {
+	if rootCmd.Args == nil {
+		t.Fatal("rootCmd.Args must be set so cobra doesn't fall back to rejecting positional args")
+	}
+	if err := rootCmd.Args(rootCmd, []string{"brew", "npm"}); err != nil {
+		t.Errorf("expected provider positional args to be accepted, got error: %v", err)
+	}
+}
+
 // --- filterEnabledProviders ---
 
 func TestFilterEnabledProviders_AllEnabled(t *testing.T) {
