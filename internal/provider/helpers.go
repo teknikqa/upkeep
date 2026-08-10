@@ -80,6 +80,34 @@ func RunCommandWithLog(ctx context.Context, logger *logging.Logger, name string,
 	return buf.String(), err
 }
 
+// RunCommandInteractive is like RunCommandWithLog, but also connects the
+// command's stdin to the calling process's stdin. RunCommand and friends
+// leave Stdin unset, which os/exec connects to /dev/null — fine for
+// non-interactive tools, but it means a child process needing to prompt for
+// input (e.g. `sudo` asking for a password) has no tty to prompt on and
+// fails immediately. Used for commands that may need to prompt interactively
+// when run from a real terminal.
+func RunCommandInteractive(ctx context.Context, logger *logging.Logger, name string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Stdin = os.Stdin
+	var buf bytes.Buffer
+
+	writers := []io.Writer{&buf}
+	if logger != nil {
+		writers = append(writers, logger.Writer())
+	}
+	if vw := getVerboseWriter(); vw != nil {
+		writers = append(writers, vw)
+	}
+
+	combined := io.MultiWriter(writers...)
+	cmd.Stdout = combined
+	cmd.Stderr = combined
+
+	err := cmd.Run()
+	return buf.String(), err
+}
+
 // RunCommandEnv is like RunCommand but allows setting extra environment variables.
 // envPairs should be in "KEY=VALUE" format.
 func RunCommandEnv(ctx context.Context, envPairs []string, name string, args ...string) (stdout, stderr string, err error) {

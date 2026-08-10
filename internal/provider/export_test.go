@@ -117,3 +117,8 @@ func CompareVersions(installed []marketplace.Extension, latest map[string]market
 
 // ExportDownloadFile exposes downloadFile for testing.
 var ExportDownloadFile = downloadFile
+
+// ParseMasOutdated exposes parseMasOutdated for testing.
+func ParseMasOutdated(output string) []OutdatedItem {
+	return parseMasOutdated(output)
+}

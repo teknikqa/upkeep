@@ -376,6 +376,58 @@ func TestOnUpgradeProgressLine_IgnoresNonMatchingLines(t *testing.T) {
 	}
 }
 
+// --- RunCommandInteractive ---
+
+func TestRunCommandInteractive_CapturesOutputAndLogs(t *testing.T) {
+	dir := t.TempDir()
+	logger := logging.New(dir, logging.LevelInfo)
+	defer logger.Close()
+
+	out, err := provider.RunCommandInteractive(context.Background(), logger, "echo", "interactive-logged")
+	if err != nil {
+		t.Fatalf("RunCommandInteractive: %v", err)
+	}
+	if !strings.Contains(out, "interactive-logged") {
+		t.Errorf("expected return value to contain 'interactive-logged', got %q", out)
+	}
+
+	logPath := logger.CurrentLogPath()
+	data, readErr := os.ReadFile(logPath)
+	if readErr != nil {
+		t.Fatalf("reading log file: %v", readErr)
+	}
+	if !strings.Contains(string(data), "interactive-logged") {
+		t.Errorf("expected log file to contain 'interactive-logged', got %q", string(data))
+	}
+}
+
+func TestRunCommandInteractive_NilLogger(t *testing.T) {
+	out, err := provider.RunCommandInteractive(context.Background(), nil, "echo", "no-logger")
+	if err != nil {
+		t.Fatalf("RunCommandInteractive(nil logger): %v", err)
+	}
+	if !strings.Contains(out, "no-logger") {
+		t.Errorf("expected stdout to contain 'no-logger', got %q", out)
+	}
+}
+
+func TestRunCommandInteractive_TeesVerboseOutput(t *testing.T) {
+	var verboseBuf bytes.Buffer
+	provider.SetVerboseOutput(&verboseBuf)
+	t.Cleanup(func() { provider.SetVerboseOutput(nil) })
+
+	out, err := provider.RunCommandInteractive(context.Background(), nil, "echo", "interactive-verbose")
+	if err != nil {
+		t.Fatalf("RunCommandInteractive: %v", err)
+	}
+	if !strings.Contains(out, "interactive-verbose") {
+		t.Errorf("expected return value to contain 'interactive-verbose', got %q", out)
+	}
+	if !strings.Contains(verboseBuf.String(), "interactive-verbose") {
+		t.Errorf("expected verbose buffer to contain 'interactive-verbose', got %q", verboseBuf.String())
+	}
+}
+
 // --- RunCommandVerbose ---
 
 func TestRunCommandVerbose_TeesOutput(t *testing.T) {
