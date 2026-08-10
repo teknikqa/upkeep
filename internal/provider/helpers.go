@@ -141,6 +141,70 @@ func RunCommandVerbose(ctx context.Context, logger *logging.Logger, extraWriter 
 	return buf.String(), err
 }
 
+// streamWriter is an io.Writer that buffers partial writes and invokes onLine
+// for each complete line as it becomes available, so a caller can react to a
+// command's progress output while the command is still running.
+type streamWriter struct {
+	buf    bytes.Buffer
+	onLine func(string)
+}
+
+func (w *streamWriter) Write(p []byte) (int, error) {
+	w.buf.Write(p)
+	for {
+		data := w.buf.Bytes()
+		idx := bytes.IndexByte(data, '\n')
+		if idx < 0 {
+			break
+		}
+		line := string(data[:idx])
+		w.buf.Next(idx + 1)
+		w.onLine(line)
+	}
+	return len(p), nil
+}
+
+// runStreaming is the shared implementation behind RunCommandStreamWithLog and
+// RunCommandEnvStreamWithLog.
+func runStreaming(ctx context.Context, logger *logging.Logger, envPairs []string, onLine func(string), name string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	if len(envPairs) > 0 {
+		cmd.Env = append(os.Environ(), envPairs...)
+	}
+	var buf bytes.Buffer
+
+	writers := []io.Writer{&buf}
+	if logger != nil {
+		writers = append(writers, logger.Writer())
+	}
+	if vw := getVerboseWriter(); vw != nil {
+		writers = append(writers, vw)
+	}
+	if onLine != nil {
+		writers = append(writers, &streamWriter{onLine: onLine})
+	}
+
+	combined := io.MultiWriter(writers...)
+	cmd.Stdout = combined
+	cmd.Stderr = combined
+
+	err := cmd.Run()
+	return buf.String(), err
+}
+
+// RunCommandStreamWithLog is like RunCommandWithLog, but also invokes onLine
+// for each complete line of combined output as it is produced, before the
+// command exits. Used to surface live per-item progress from commands that
+// print structured progress lines (e.g. Homebrew's "==> Upgrading <name>").
+func RunCommandStreamWithLog(ctx context.Context, logger *logging.Logger, onLine func(string), name string, args ...string) (string, error) {
+	return runStreaming(ctx, logger, nil, onLine, name, args...)
+}
+
+// RunCommandEnvStreamWithLog is RunCommandStreamWithLog with extra environment variables.
+func RunCommandEnvStreamWithLog(ctx context.Context, logger *logging.Logger, envPairs []string, onLine func(string), name string, args ...string) (string, error) {
+	return runStreaming(ctx, logger, envPairs, onLine, name, args...)
+}
+
 // BatchUpgrade upgrades a set of named packages using a single batched command
 // for speed, falling back to per-package execution to attribute failures
 // accurately when the batch reports an error.
@@ -155,9 +219,14 @@ func RunCommandVerbose(ctx context.Context, logger *logging.Logger, extraWriter 
 // exact.
 //
 // batch runs the combined command for all names; one runs the command for a
-// single name. Both return combined output and an error. PackageStarting is
-// reported for every name up front, then PackageUpdated / PackageFailed as
-// outcomes are known. Returns the updated and failed name lists.
+// single name. Both return combined output and an error. For the single-name
+// and per-item fallback paths, PackageStarting is reported immediately before
+// each invocation since it corresponds to a real, individually-running
+// command. For the batched fast path, batch() is responsible for reporting
+// PackageStarting itself as it observes real per-package progress (e.g. by
+// parsing the command's live output) — BatchUpgrade only reports the
+// terminal PackageUpdated once the whole batch succeeds. Returns the updated
+// and failed name lists.
 func BatchUpgrade(
 	ctx context.Context,
 	names []string,
@@ -168,13 +237,10 @@ func BatchUpgrade(
 		return nil, nil
 	}
 
-	for _, n := range names {
-		ReportProgress(ctx, n, PackageStarting)
-	}
-
 	// A single package gains nothing from batching; run it directly so a
 	// failure isn't paid for twice.
 	if len(names) == 1 {
+		ReportProgress(ctx, names[0], PackageStarting)
 		if _, err := one(ctx, names[0]); err != nil {
 			ReportProgress(ctx, names[0], PackageFailed)
 			return nil, []string{names[0]}
@@ -183,7 +249,8 @@ func BatchUpgrade(
 		return []string{names[0]}, nil
 	}
 
-	// Fast path: one batched command for everything.
+	// Fast path: one batched command for everything. batch() reports
+	// PackageStarting per name itself as real progress is observed.
 	if _, err := batch(ctx, names); err == nil {
 		for _, n := range names {
 			ReportProgress(ctx, n, PackageUpdated)
@@ -193,6 +260,7 @@ func BatchUpgrade(
 
 	// Batch failed somewhere; re-run each to attribute outcomes precisely.
 	for _, n := range names {
+		ReportProgress(ctx, n, PackageStarting)
 		if _, err := one(ctx, n); err != nil {
 			failed = append(failed, n)
 			ReportProgress(ctx, n, PackageFailed)

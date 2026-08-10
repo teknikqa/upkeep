@@ -108,15 +108,24 @@ func (p *BrewCaskProvider) Update(ctx context.Context, items []OutdatedItem) Upd
 	}
 
 	// Update non-auth casks with NONINTERACTIVE=1. Homebrew's global lock rules
-	// out concurrent processes, so batch them into one invocation instead.
+	// out concurrent processes, so batch them into one invocation instead. To
+	// still surface accurate per-package progress, stream the batch command's
+	// output and watch for Homebrew's own "==> Upgrading <name>" progress lines.
 	env := []string{"NONINTERACTIVE=1"}
 	noAuthNames := make([]string, len(noAuth))
+	tracked := make(map[string]bool, len(noAuth))
 	for i, item := range noAuth {
 		noAuthNames[i] = item.Name
+		tracked[item.Name] = true
 	}
 	noAuthUpdated, noAuthFailed := BatchUpgrade(ctx, noAuthNames,
 		func(ctx context.Context, names []string) (string, error) {
-			out, err := RunCommandEnvWithLog(ctx, p.logger, env, "brew", append([]string{"upgrade", "--cask"}, names...)...)
+			onLine := func(line string) {
+				if pkg, ok := strings.CutPrefix(line, "==> Upgrading "); ok && tracked[pkg] {
+					ReportProgress(ctx, pkg, PackageStarting)
+				}
+			}
+			out, err := RunCommandEnvStreamWithLog(ctx, p.logger, env, onLine, "brew", append([]string{"upgrade", "--cask"}, names...)...)
 			if err != nil {
 				p.logf("brew upgrade --cask (batch) error: %v\n%s", err, out)
 			}
