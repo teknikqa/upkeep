@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-10
+
+### Added
+
+- **Mac App Store apps** can now be scanned and updated via a new `mas` provider (requires `brew install mas`). Every mas update re-execs itself via `sudo` with no way to opt out, so `upkeep` caches credentials once per run rather than prompting per app.
+
+### Fixed
+
+- Homebrew formula/cask upgrade progress no longer freezes the `Updating:` indicator on the last package in a batch for the whole run — real per-package progress is now parsed from Homebrew's own output as it upgrades each package, instead of being reported all at once before the batched command even starts.
+- `upkeep brew`, `upkeep npm`, and other `upkeep [provider...]` invocations — the usage documented in `upkeep --help` — no longer fail with `unknown command`.
+
 ## [0.8.1] - 2026-07-23
 
 ### Fixed
@@ -129,7 +140,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release**: GoReleaser for macOS amd64 + arm64 binaries
 - **Dependabot**: Weekly updates for Go modules and GitHub Actions
 
-[Unreleased]: https://github.com/teknikqa/upkeep/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/teknikqa/upkeep/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/teknikqa/upkeep/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/teknikqa/upkeep/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/teknikqa/upkeep/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/teknikqa/upkeep/compare/v0.6.0...v0.7.0
