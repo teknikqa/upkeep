@@ -27,7 +27,12 @@ var (
 
 // rootCmd represents the base command
 var rootCmd = &cobra.Command{
-	Use:   "upkeep [provider...]",
+	Use: "upkeep [provider...]",
+	// Without this, cobra's default Args validator rejects positional args
+	// once any subcommands are registered (config, completion, help),
+	// treating "upkeep brew" as an attempt to run an unknown subcommand
+	// "brew" instead of a provider filter.
+	Args:  cobra.ArbitraryArgs,
 	Short: "A Go-based system updater for macOS",
 	Long: `upkeep is a shell-independent system updater for macOS that manages
 updates for Homebrew, npm, pip, Rust, VS Code extensions, and more.
