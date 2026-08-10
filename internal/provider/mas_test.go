@@ -2,6 +2,7 @@ package provider_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/teknikqa/upkeep/internal/config"
@@ -84,6 +85,73 @@ not valid json
 	items := provider.ParseMasOutdated(input)
 	if len(items) != 2 {
 		t.Fatalf("expected 2 valid items with the malformed line skipped, got %d", len(items))
+	}
+}
+
+func TestMasProvider_Scan_WithOverride(t *testing.T) {
+	tests := []struct {
+		name          string
+		stdout        string
+		err           error
+		wantAvailable bool
+		wantErr       bool
+		wantCount     int
+	}{
+		{
+			name:          "outdated apps",
+			stdout:        sampleMasOutdated,
+			wantAvailable: true,
+			wantCount:     2,
+		},
+		{
+			name:          "nothing outdated",
+			stdout:        "",
+			wantAvailable: true,
+			wantCount:     0,
+		},
+		{
+			name:          "command error",
+			err:           errors.New("mas outdated failed"),
+			wantAvailable: true,
+			wantErr:       true,
+			wantCount:     0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := provider.NewMasProvider(config.MasConfig{Enabled: true}, nil)
+			p.SetListOutdated(func(_ context.Context) (string, error) {
+				return tt.stdout, tt.err
+			})
+
+			result := p.Scan(context.Background())
+			if result.Available != tt.wantAvailable {
+				t.Errorf("expected Available=%v, got %v", tt.wantAvailable, result.Available)
+			}
+			if (result.Error != nil) != tt.wantErr {
+				t.Errorf("expected error=%v, got %v", tt.wantErr, result.Error)
+			}
+			if len(result.Outdated) != tt.wantCount {
+				t.Errorf("expected %d outdated items, got %d", tt.wantCount, len(result.Outdated))
+			}
+		})
+	}
+}
+
+// TestMasProvider_Scan_RealMas exercises the real `mas outdated --json`
+// invocation (no listOutdated override) to cover runOutdated's default
+// branch. We don't assert specific contents — the machine may or may not
+// have outdated App Store apps — only that Scan completes without panicking.
+func TestMasProvider_Scan_RealMas(t *testing.T) {
+	if !provider.CommandExistsExport("mas") {
+		t.Skip("mas not available")
+	}
+	p := provider.NewMasProvider(config.MasConfig{Enabled: true}, nil)
+	// No SetListOutdated — exercise the real mas invocation.
+	result := p.Scan(context.Background())
+	if !result.Available {
+		t.Errorf("expected Available=true, got false")
 	}
 }
 

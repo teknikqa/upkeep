@@ -122,3 +122,8 @@ var ExportDownloadFile = downloadFile
 func ParseMasOutdated(output string) []OutdatedItem {
 	return parseMasOutdated(output)
 }
+
+// SetListOutdated sets the `mas outdated` query override on a MasProvider for testing.
+func (p *MasProvider) SetListOutdated(fn func(ctx context.Context) (string, error)) {
+	p.listOutdated = fn
+}

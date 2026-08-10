@@ -27,6 +27,11 @@ type masOutdatedLine struct {
 type MasProvider struct {
 	cfg    config.MasConfig
 	logger *logging.Logger
+
+	// listOutdated overrides the `mas outdated --json` query for testing.
+	// When set, it also bypasses the CommandExists("mas") gate in Scan, since
+	// mas (unlike e.g. pip3) isn't preinstalled in most CI environments.
+	listOutdated func(ctx context.Context) (string, error)
 }
 
 // NewMasProvider creates a new Mac App Store provider.
@@ -40,16 +45,26 @@ func (p *MasProvider) DependsOn() []string { return nil }
 
 // Scan runs `mas outdated --json` and returns outdated App Store apps.
 func (p *MasProvider) Scan(ctx context.Context) ScanResult {
-	if !CommandExists("mas") {
+	if p.listOutdated == nil && !CommandExists("mas") {
 		return ScanResult{Available: false, Message: "mas not found"}
 	}
 
-	stdout, _, err := RunCommand(ctx, "mas", "outdated", "--json")
+	stdout, err := p.runOutdated(ctx)
 	if err != nil {
 		return ScanResult{Available: true, Error: err, Message: "mas outdated failed"}
 	}
 
 	return ScanResult{Available: true, Outdated: parseMasOutdated(stdout)}
+}
+
+// runOutdated calls the provider's override if set, otherwise runs the real
+// `mas outdated --json` command.
+func (p *MasProvider) runOutdated(ctx context.Context) (string, error) {
+	if p.listOutdated != nil {
+		return p.listOutdated(ctx)
+	}
+	stdout, _, err := RunCommand(ctx, "mas", "outdated", "--json")
+	return stdout, err
 }
 
 // Update upgrades the specified apps. mas re-execs itself via sudo for every
