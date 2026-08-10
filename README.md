@@ -12,7 +12,7 @@ A Go CLI tool that keeps your macOS development environment up to date.
 
 ## Features
 
-- **11 providers**: Homebrew formulae, Homebrew casks, npm, Composer, pip, Rust, VS Code extensions, Oh My Zsh, Vim, Vagrant, Mac App Store apps
+- **11 providers** covering Homebrew, npm, Composer, pip, Rust, editor extensions, Oh My Zsh, Vim, Vagrant, and the Mac App Store — see [Providers](#providers)
 - **Scan → Confirm → Execute → Report pipeline** with pterm TUI output
 - **Parallel execution** with configurable parallelism and dependency ordering (brew-cask waits for brew)
 - **Batched upgrades**: package managers that accept multiple packages (Homebrew, npm, pip) upgrade everything in a single command — faster, and the only way to parallelize Homebrew, whose global lock blocks concurrent processes. A failing batch automatically re-runs each package individually so failures stay isolated. Editor extensions update concurrently across editors.
@@ -21,6 +21,24 @@ A Go CLI tool that keeps your macOS development environment up to date.
 - **Deferred cask script**: `--run-deferred` executes the generated script for auth-required casks
 - **YAML config** with per-provider skip lists, auth overrides, and strategy settings — editable via **interactive TUI** or by hand
 - **macOS notifications** via `terminal-notifier` (falls back to `osascript`)
+
+## Providers
+
+| Name | Updates | Requires |
+|------|---------|----------|
+| `brew` | Homebrew formulae | [Homebrew](https://brew.sh) |
+| `brew-cask` | Homebrew casks | [Homebrew](https://brew.sh) |
+| `npm` | Globally-installed npm packages | `npm` |
+| `composer` | Globally-installed Composer packages | `composer` |
+| `pip` | pip3 + pipx packages | `pip3` and/or `pipx` |
+| `rust` | Rust toolchains (rustup) and cargo-installed binaries | `rustup`, [`cargo-update`](https://github.com/nabijaczleweli/cargo-update) |
+| `editor` | Installed extensions for VS Code, Cursor, Kiro, Windsurf, and other VS Code–compatible editors | the editor's CLI (`code`, `cursor`, etc.) |
+| `mas` | Apps installed from the Mac App Store | [`mas`](https://github.com/mas-cli/mas) (`brew install mas`) — every update needs admin auth; `upkeep` caches sudo credentials once per run rather than prompting per app |
+| `omz` | Oh My Zsh itself | Oh My Zsh installed |
+| `vim` | Vim plugins (vim-plug or pathogen) | Vim + a supported plugin manager |
+| `vagrant` | Vagrant boxes | `vagrant` |
+
+Run `upkeep --list` to see which providers are currently registered, or `upkeep <name> [<name> ...]` to update specific ones (e.g. `upkeep brew npm`). A provider that's missing its required tool is reported as unavailable and skipped rather than erroring.
 
 ## Installation
 
