@@ -37,6 +37,7 @@ type ProvidersConfig struct {
 	Omz      OmzConfig      `yaml:"omz"`
 	Vim      VimConfig      `yaml:"vim"`
 	Vagrant  VagrantConfig  `yaml:"vagrant"`
+	Mas      MasConfig      `yaml:"mas"`
 }
 
 // BrewConfig configures the Homebrew formulae provider.
@@ -109,6 +110,12 @@ type VagrantConfig struct {
 	Notify  bool `yaml:"notify"`
 }
 
+// MasConfig configures the Mac App Store (mas) provider.
+type MasConfig struct {
+	Enabled bool     `yaml:"enabled"`
+	Skip    []string `yaml:"skip"`
+}
+
 // NotificationsConfig configures macOS notifications.
 type NotificationsConfig struct {
 	Enabled bool   `yaml:"enabled"`
@@ -167,6 +174,7 @@ func Defaults() *Config {
 				BundlesDir:   "~/.vim/bundle",
 			},
 			Vagrant: VagrantConfig{Enabled: true, Notify: true},
+			Mas:     MasConfig{Enabled: true},
 		},
 		Notifications: NotificationsConfig{
 			Enabled: true,

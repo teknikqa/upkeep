@@ -63,7 +63,8 @@ type OutdatedItem struct {
 	Name           string
 	CurrentVersion string
 	LatestVersion  string
-	AuthRequired   bool // only relevant for brew-cask
+	AuthRequired   bool   // only relevant for brew-cask
+	AppID          string // Mac App Store numeric app ID; only relevant for mas
 }
 
 // ScanResult is returned by Provider.Scan().

@@ -117,3 +117,13 @@ func CompareVersions(installed []marketplace.Extension, latest map[string]market
 
 // ExportDownloadFile exposes downloadFile for testing.
 var ExportDownloadFile = downloadFile
+
+// ParseMasOutdated exposes parseMasOutdated for testing.
+func ParseMasOutdated(output string) []OutdatedItem {
+	return parseMasOutdated(output)
+}
+
+// SetListOutdated sets the `mas outdated` query override on a MasProvider for testing.
+func (p *MasProvider) SetListOutdated(fn func(ctx context.Context) (string, error)) {
+	p.listOutdated = fn
+}
