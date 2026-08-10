@@ -120,11 +120,7 @@ func (p *BrewCaskProvider) Update(ctx context.Context, items []OutdatedItem) Upd
 	}
 	noAuthUpdated, noAuthFailed := BatchUpgrade(ctx, noAuthNames,
 		func(ctx context.Context, names []string) (string, error) {
-			onLine := func(line string) {
-				if pkg, ok := strings.CutPrefix(line, "==> Upgrading "); ok && tracked[pkg] {
-					ReportProgress(ctx, pkg, PackageStarting)
-				}
-			}
+			onLine := OnUpgradeProgressLine(ctx, tracked)
 			out, err := RunCommandEnvStreamWithLog(ctx, p.logger, env, onLine, "brew", append([]string{"upgrade", "--cask"}, names...)...)
 			if err != nil {
 				p.logf("brew upgrade --cask (batch) error: %v\n%s", err, out)

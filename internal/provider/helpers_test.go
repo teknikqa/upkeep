@@ -249,6 +249,55 @@ func TestRunCommandStreamWithLog_InvokesOnLinePerLine(t *testing.T) {
 	}
 }
 
+func TestRunCommandStreamWithLog_CapturesOutputAndLogs(t *testing.T) {
+	dir := t.TempDir()
+	logger := logging.New(dir, logging.LevelInfo)
+	defer logger.Close()
+
+	var lines []string
+	out, err := provider.RunCommandStreamWithLog(context.Background(), logger, func(line string) {
+		lines = append(lines, line)
+	}, "echo", "logged-and-streamed")
+	if err != nil {
+		t.Fatalf("RunCommandStreamWithLog: %v", err)
+	}
+	if want := []string{"logged-and-streamed"}; !slices.Equal(lines, want) {
+		t.Errorf("expected onLine calls %v, got %v", want, lines)
+	}
+	if !strings.Contains(out, "logged-and-streamed") {
+		t.Errorf("expected return value to contain 'logged-and-streamed', got %q", out)
+	}
+
+	logPath := logger.CurrentLogPath()
+	data, readErr := os.ReadFile(logPath)
+	if readErr != nil {
+		t.Fatalf("reading log file: %v", readErr)
+	}
+	if !strings.Contains(string(data), "logged-and-streamed") {
+		t.Errorf("expected log file to contain 'logged-and-streamed', got %q", string(data))
+	}
+}
+
+func TestRunCommandStreamWithLog_TeesVerboseOutput(t *testing.T) {
+	var verboseBuf bytes.Buffer
+	provider.SetVerboseOutput(&verboseBuf)
+	t.Cleanup(func() { provider.SetVerboseOutput(nil) })
+
+	var lines []string
+	_, err := provider.RunCommandStreamWithLog(context.Background(), nil, func(line string) {
+		lines = append(lines, line)
+	}, "echo", "verbose-streamed")
+	if err != nil {
+		t.Fatalf("RunCommandStreamWithLog: %v", err)
+	}
+	if want := []string{"verbose-streamed"}; !slices.Equal(lines, want) {
+		t.Errorf("expected onLine calls %v, got %v", want, lines)
+	}
+	if !strings.Contains(verboseBuf.String(), "verbose-streamed") {
+		t.Errorf("expected verbose buffer to contain 'verbose-streamed', got %q", verboseBuf.String())
+	}
+}
+
 func TestRunCommandStreamWithLog_NilOnLine(t *testing.T) {
 	// Should not panic when onLine is nil.
 	out, err := provider.RunCommandStreamWithLog(context.Background(), nil, nil, "echo", "no-callback")
@@ -273,6 +322,57 @@ func TestRunCommandEnvStreamWithLog_InvokesOnLinePerLine(t *testing.T) {
 	}
 	if !strings.Contains(out, "env-streamed") {
 		t.Errorf("expected combined output to contain 'env-streamed', got %q", out)
+	}
+}
+
+// --- OnUpgradeProgressLine ---
+
+func TestOnUpgradeProgressLine_MatchesTrackedName(t *testing.T) {
+	var events []provider.PackageProgress
+	ctx := provider.ContextWithProgress(context.Background(), func(p provider.PackageProgress) {
+		events = append(events, p)
+	})
+
+	onLine := provider.OnUpgradeProgressLine(ctx, map[string]bool{"git": true, "jq": true})
+	onLine("==> Upgrading git")
+
+	want := []provider.PackageProgress{{Name: "git", Status: provider.PackageStarting}}
+	if !slices.Equal(events, want) {
+		t.Errorf("expected events %v, got %v", want, events)
+	}
+}
+
+func TestOnUpgradeProgressLine_IgnoresUntrackedName(t *testing.T) {
+	var events []provider.PackageProgress
+	ctx := provider.ContextWithProgress(context.Background(), func(p provider.PackageProgress) {
+		events = append(events, p)
+	})
+
+	// "wget" is being upgraded as an auto-pulled dependent, not one of the
+	// packages we're tracking in this batch — should be ignored.
+	onLine := provider.OnUpgradeProgressLine(ctx, map[string]bool{"git": true})
+	onLine("==> Upgrading wget")
+
+	if len(events) != 0 {
+		t.Errorf("expected no events for untracked name, got %v", events)
+	}
+}
+
+func TestOnUpgradeProgressLine_IgnoresNonMatchingLines(t *testing.T) {
+	var events []provider.PackageProgress
+	ctx := provider.ContextWithProgress(context.Background(), func(p provider.PackageProgress) {
+		events = append(events, p)
+	})
+
+	onLine := provider.OnUpgradeProgressLine(ctx, map[string]bool{"git": true})
+	// Homebrew's own summary header shares the "==> Upgrading " prefix but
+	// isn't a package name; other unrelated lines shouldn't match either.
+	onLine("==> Upgrading 1 outdated package")
+	onLine("==> Fetching git")
+	onLine("some other output")
+
+	if len(events) != 0 {
+		t.Errorf("expected no events for non-matching lines, got %v", events)
 	}
 }
 
