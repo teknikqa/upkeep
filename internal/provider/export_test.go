@@ -127,3 +127,8 @@ func ParseMasOutdated(output string) []OutdatedItem {
 func (p *MasProvider) SetListOutdated(fn func(ctx context.Context) (string, error)) {
 	p.listOutdated = fn
 }
+
+// IsUvManagedInstall exposes isUvManagedInstall for testing.
+func IsUvManagedInstall(output string) bool {
+	return isUvManagedInstall(output)
+}
