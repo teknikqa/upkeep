@@ -42,7 +42,7 @@ func TestIsUvManagedInstall(t *testing.T) {
 	}{
 		{
 			name:   "managed install message",
-			output: "error: Self-update is only available for uv binaries installed via the standalone installation scripts.",
+			output: "error: uv was installed through an external package manager and cannot update itself.",
 			want:   true,
 		},
 		{

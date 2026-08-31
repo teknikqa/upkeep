@@ -96,10 +96,12 @@ func (p *UvProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRes
 
 // isUvManagedInstall reports whether uv's self-update output indicates uv
 // was installed via a package manager rather than the standalone installer,
-// in which case `uv self update` refuses to run.
+// in which case `uv self update` refuses to run. e.g.:
+//
+//	error: uv was installed through an external package manager and cannot update itself.
 func isUvManagedInstall(output string) bool {
 	lower := strings.ToLower(output)
-	return strings.Contains(lower, "self-update") && strings.Contains(lower, "only available")
+	return strings.Contains(lower, "external package manager") && strings.Contains(lower, "cannot update itself")
 }
 
 func (p *UvProvider) logf(format string, args ...any) {
