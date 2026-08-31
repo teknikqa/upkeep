@@ -33,6 +33,7 @@ type ProvidersConfig struct {
 	Composer ComposerConfig `yaml:"composer"`
 	Pip      PipConfig      `yaml:"pip"`
 	Rust     RustConfig     `yaml:"rust"`
+	Uv       UvConfig       `yaml:"uv"`
 	Editor   EditorConfig   `yaml:"editor"`
 	Omz      OmzConfig      `yaml:"omz"`
 	Vim      VimConfig      `yaml:"vim"`
@@ -81,6 +82,13 @@ type RustConfig struct {
 	Enabled            bool `yaml:"enabled"`
 	Rustup             bool `yaml:"rustup"`
 	CargoInstallUpdate bool `yaml:"cargo_install_update"`
+}
+
+// UvConfig configures the uv (Python package/tool manager) provider.
+type UvConfig struct {
+	Enabled    bool `yaml:"enabled"`
+	SelfUpdate bool `yaml:"self_update"`
+	Tool       bool `yaml:"tool"`
 }
 
 // EditorConfig configures the code editor extension provider.
@@ -160,6 +168,11 @@ func Defaults() *Config {
 				Enabled:            true,
 				Rustup:             true,
 				CargoInstallUpdate: true,
+			},
+			Uv: UvConfig{
+				Enabled:    true,
+				SelfUpdate: true,
+				Tool:       true,
 			},
 			Editor: EditorConfig{
 				Enabled: true,
