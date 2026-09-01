@@ -30,7 +30,7 @@ A Go CLI tool that keeps your macOS development environment up to date.
 | `brew-cask` | Homebrew casks | [Homebrew](https://brew.sh) |
 | `bun` | Globally-installed bun packages | `bun` |
 | `composer` | Globally-installed Composer packages | `composer` |
-| `editor` | Installed extensions for VS Code, Cursor, Kiro, Windsurf, and other VS Code–compatible editors | the editor's CLI (`code`, `cursor`, etc.) |
+| `editor` | Installed extensions for VS Code, Cursor, Kiro, Windsurf, and Agy | the editor's CLI (`code`, `cursor`, `kiro`, `windsurf`, or `agy`) |
 | `mas` | Apps installed from the Mac App Store | [`mas`](https://github.com/mas-cli/mas) (`brew install mas`) — every update needs admin auth; `upkeep` caches sudo credentials once per run rather than prompting per app |
 | `npm` | Globally-installed npm packages | `npm` |
 | `omz` | Oh My Zsh itself | Oh My Zsh installed |
