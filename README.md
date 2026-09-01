@@ -28,19 +28,19 @@ A Go CLI tool that keeps your macOS development environment up to date.
 |------|---------|----------|
 | `brew` | Homebrew formulae | [Homebrew](https://brew.sh) |
 | `brew-cask` | Homebrew casks | [Homebrew](https://brew.sh) |
-| `npm` | Globally-installed npm packages | `npm` |
-| `pnpm` | Globally-installed pnpm packages | `pnpm` — requires `pnpm setup` to have added its global bin dir to `PATH`; otherwise this provider reports 0 outdated |
-| `yarn` | Globally-installed Yarn (classic) packages | `yarn` — Yarn Classic (1.x) has no per-package outdated listing, so this runs a wholesale `yarn global upgrade`; Yarn Berry (2.x+) removed `yarn global` entirely, so this provider detects Berry and skips with a message instead |
 | `bun` | Globally-installed bun packages | `bun` |
 | `composer` | Globally-installed Composer packages | `composer` |
-| `pip` | pip3 + pipx packages | `pip3` and/or `pipx` |
-| `rust` | Rust toolchains (rustup) and cargo-installed binaries | `rustup`, [`cargo-update`](https://github.com/nabijaczleweli/cargo-update) |
-| `uv` | [`uv`](https://docs.astral.sh/uv/) itself and globally-installed `uv tool` packages | `uv` — self-update only works for standalone installs; brew/pip-installed `uv` skips that step |
 | `editor` | Installed extensions for VS Code, Cursor, Kiro, Windsurf, and other VS Code–compatible editors | the editor's CLI (`code`, `cursor`, etc.) |
 | `mas` | Apps installed from the Mac App Store | [`mas`](https://github.com/mas-cli/mas) (`brew install mas`) — every update needs admin auth; `upkeep` caches sudo credentials once per run rather than prompting per app |
+| `npm` | Globally-installed npm packages | `npm` |
 | `omz` | Oh My Zsh itself | Oh My Zsh installed |
-| `vim` | Vim plugins (vim-plug or pathogen) | Vim + a supported plugin manager |
+| `pip` | pip3 + pipx packages | `pip3` and/or `pipx` |
+| `pnpm` | Globally-installed pnpm packages | `pnpm` — requires `pnpm setup` to have added its global bin dir to `PATH`; otherwise this provider reports 0 outdated |
+| `rust` | Rust toolchains (rustup) and cargo-installed binaries | `rustup`, [`cargo-update`](https://github.com/nabijaczleweli/cargo-update) |
+| `uv` | [`uv`](https://docs.astral.sh/uv/) itself and globally-installed `uv tool` packages | `uv` — self-update only works for standalone installs; brew/pip-installed `uv` skips that step |
 | `vagrant` | Vagrant boxes | `vagrant` |
+| `vim` | Vim plugins (vim-plug or pathogen) | Vim + a supported plugin manager |
+| `yarn` | Globally-installed Yarn (classic) packages | `yarn` — Yarn Classic (1.x) has no per-package outdated listing, so this runs a wholesale `yarn global upgrade`; Yarn Berry (2.x+) removed `yarn global` entirely, so this provider detects Berry and skips with a message instead |
 
 Run `upkeep --list` to see which providers are currently registered, or `upkeep <name> [<name> ...]` to update specific ones (e.g. `upkeep brew npm`). A provider that's missing its required tool is reported as unavailable and skipped rather than erroring.
 
