@@ -158,6 +158,11 @@ func IsPnpmGlobalBinNotInPath(output string) bool {
 	return isPnpmGlobalBinNotInPath(output)
 }
 
+// IsPnpmNoGlobalManifest exposes isPnpmNoGlobalManifest for testing.
+func IsPnpmNoGlobalManifest(output string) bool {
+	return isPnpmNoGlobalManifest(output)
+}
+
 // SetCheckAvailable sets the `pnpm` availability override on a PnpmProvider for testing.
 func (p *PnpmProvider) SetCheckAvailable(fn func() bool) {
 	p.checkAvailable = fn

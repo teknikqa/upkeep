@@ -72,6 +72,14 @@ func (p *PnpmProvider) Scan(ctx context.Context) ScanResult {
 		return ScanResult{Available: true, Outdated: nil}
 	}
 
+	// A pnpm install (of any version) that has never had a single package
+	// installed globally has no global manifest yet — verified against
+	// pnpm 10.30.3 (via corepack), which reports this on stdout rather than
+	// an empty/`{}` result.
+	if isPnpmNoGlobalManifest(stdout) {
+		return ScanResult{Available: true, Outdated: nil}
+	}
+
 	items, err := parsePnpmOutdated(stdout)
 	if err != nil {
 		p.logf("parsing pnpm outdated output: %v", err)
@@ -158,6 +166,16 @@ func (p *PnpmProvider) doUpdate(ctx context.Context, names []string) (string, er
 func isPnpmGlobalBinNotInPath(output string) bool {
 	lower := strings.ToLower(output)
 	return strings.Contains(lower, "global bin directory") && strings.Contains(lower, "not in path")
+}
+
+// isPnpmNoGlobalManifest reports whether pnpm's outdated output indicates no
+// package has ever been installed globally (no global manifest exists yet),
+// in which case `pnpm outdated -g` exits 1 with this message on stdout
+// instead of printing `{}`. e.g.:
+//
+//	ERR_PNPM_NO_IMPORTER_MANIFEST_FOUND  No package.json (or package.yaml, or package.json5) was found in "...".
+func isPnpmNoGlobalManifest(output string) bool {
+	return strings.Contains(output, "ERR_PNPM_NO_IMPORTER_MANIFEST_FOUND")
 }
 
 // parsePnpmOutdated parses the JSON output of `pnpm outdated -g --format json`.

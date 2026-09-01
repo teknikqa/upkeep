@@ -34,6 +34,12 @@ const samplePnpmOutdated = `{
 const samplePnpmGlobalBinNotInPath = `[ERROR] The configured global bin directory "/Users/nickmathew/Library/pnpm/bin" is not in PATH
 Run "pnpm setup" to update your shell configuration.`
 
+// samplePnpmNoGlobalManifest is the real stdout from `pnpm outdated -g
+// --format json` when no package has ever been installed globally with
+// this pnpm install, captured against pnpm 10.30.3 (via corepack) — a
+// separate pnpm major version/global store than samplePnpmOutdated above.
+const samplePnpmNoGlobalManifest = ` ERR_PNPM_NO_IMPORTER_MANIFEST_FOUND  No package.json (or package.yaml, or package.json5) was found in "/Users/nickmathew/Library/pnpm/global/5".`
+
 func TestPnpmProvider_Name(t *testing.T) {
 	p := provider.NewPnpmProvider(config.PnpmConfig{Enabled: true}, nil)
 	if p.Name() != "pnpm" {
@@ -137,6 +143,48 @@ func TestPnpmProvider_Scan_GlobalBinNotInPath(t *testing.T) {
 	}
 	if result.Message == "" {
 		t.Error("expected a non-empty message")
+	}
+}
+
+func TestIsPnpmNoGlobalManifest(t *testing.T) {
+	cases := []struct {
+		name   string
+		output string
+		want   bool
+	}{
+		{"real error", samplePnpmNoGlobalManifest, true},
+		{"unrelated error", "network request failed", false},
+		{"empty", "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := provider.IsPnpmNoGlobalManifest(tc.output); got != tc.want {
+				t.Errorf("IsPnpmNoGlobalManifest(%q) = %v, want %v", tc.output, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPnpmProvider_Scan_NoGlobalManifest(t *testing.T) {
+	// A pnpm install with zero packages ever installed globally reports
+	// this on stdout (not an empty/`{}` result) — verified against pnpm
+	// 10.30.3 via corepack, a different pnpm version/store than the one
+	// used for the other Scan tests.
+	p := provider.NewPnpmProvider(config.PnpmConfig{Enabled: true}, nil)
+	p.SetCheckAvailable(func() bool { return true })
+	p.SetRunOutdated(func(_ context.Context) (string, string, error) {
+		return samplePnpmNoGlobalManifest, "", errors.New("exit status 1")
+	})
+
+	result := p.Scan(context.Background())
+	if !result.Available {
+		t.Fatal("expected Available=true")
+	}
+	if len(result.Outdated) != 0 {
+		t.Errorf("expected 0 outdated, got %d", len(result.Outdated))
+	}
+	if result.Error != nil {
+		t.Errorf("expected no scan error, got %v", result.Error)
 	}
 }
 

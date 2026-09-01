@@ -44,6 +44,8 @@ A Go CLI tool that keeps your macOS development environment up to date.
 
 Run `upkeep --list` to see which providers are currently registered, or `upkeep <name> [<name> ...]` to update specific ones (e.g. `upkeep brew npm`). A provider that's missing its required tool is reported as unavailable and skipped rather than erroring.
 
+`npm`/`pnpm`/`yarn` work the same whether installed directly or managed via [Corepack](https://nodejs.org/api/corepack.html) (`corepack enable`) — Corepack shims them onto `PATH` as regular executables, so no special handling is needed. Corepack's default (unpinned) `yarn` resolves to Yarn Classic (1.x), matching what the `yarn` provider expects.
+
 ## Installation
 
 ### From a release
