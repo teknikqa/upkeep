@@ -14,6 +14,18 @@ import (
 type UvProvider struct {
 	cfg    config.UvConfig
 	logger *logging.Logger
+
+	// checkAvailable overrides the `uv` binary presence check for testing.
+	// When nil, the real CommandExists("uv") is used.
+	checkAvailable func() bool
+
+	// runSelfUpdate overrides `uv self update` for testing. When nil, the
+	// real command is run.
+	runSelfUpdate func(ctx context.Context) (string, error)
+
+	// runToolUpgrade overrides `uv tool upgrade --all` for testing. When nil,
+	// the real command is run.
+	runToolUpgrade func(ctx context.Context) (string, error)
 }
 
 // NewUvProvider creates a new uv provider.
@@ -29,7 +41,7 @@ func (p *UvProvider) DependsOn() []string { return nil }
 // query for `uv self` or `uv tool`, so both operations are surfaced as
 // pseudo items that Update runs wholesale (like pip's pipx handling).
 func (p *UvProvider) Scan(ctx context.Context) ScanResult {
-	if !CommandExists("uv") {
+	if !p.isAvailable() {
 		return ScanResult{Available: false, Message: "uv not found"}
 	}
 
@@ -47,7 +59,7 @@ func (p *UvProvider) Scan(ctx context.Context) ScanResult {
 // Update runs `uv self update` and/or `uv tool upgrade --all`.
 func (p *UvProvider) Update(ctx context.Context, items []OutdatedItem) UpdateResult {
 	start := time.Now()
-	if !CommandExists("uv") {
+	if !p.isAvailable() {
 		return UpdateResult{Duration: time.Since(start)}
 	}
 
@@ -55,7 +67,7 @@ func (p *UvProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRes
 
 	if p.cfg.SelfUpdate {
 		ReportProgress(ctx, "uv-self", PackageStarting)
-		out, err := RunCommandWithLog(ctx, p.logger, "uv", "self", "update")
+		out, err := p.doSelfUpdate(ctx)
 		switch {
 		case err == nil:
 			updated = append(updated, "uv-self")
@@ -75,7 +87,7 @@ func (p *UvProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRes
 
 	if p.cfg.Tool {
 		ReportProgress(ctx, "uv-tools", PackageStarting)
-		out, err := RunCommandWithLog(ctx, p.logger, "uv", "tool", "upgrade", "--all")
+		out, err := p.doToolUpgrade(ctx)
 		if err != nil {
 			p.logf("uv tool upgrade --all error: %v\n%s", err, out)
 			failed = append(failed, "uv-tools")
@@ -92,6 +104,33 @@ func (p *UvProvider) Update(ctx context.Context, items []OutdatedItem) UpdateRes
 		Skipped:  skipped,
 		Duration: time.Since(start),
 	}
+}
+
+// isAvailable calls the provider's override if set, otherwise the real
+// CommandExists("uv") check.
+func (p *UvProvider) isAvailable() bool {
+	if p.checkAvailable != nil {
+		return p.checkAvailable()
+	}
+	return CommandExists("uv")
+}
+
+// doSelfUpdate calls the provider's override if set, otherwise runs the real
+// `uv self update` command.
+func (p *UvProvider) doSelfUpdate(ctx context.Context) (string, error) {
+	if p.runSelfUpdate != nil {
+		return p.runSelfUpdate(ctx)
+	}
+	return RunCommandWithLog(ctx, p.logger, "uv", "self", "update")
+}
+
+// doToolUpgrade calls the provider's override if set, otherwise runs the
+// real `uv tool upgrade --all` command.
+func (p *UvProvider) doToolUpgrade(ctx context.Context) (string, error) {
+	if p.runToolUpgrade != nil {
+		return p.runToolUpgrade(ctx)
+	}
+	return RunCommandWithLog(ctx, p.logger, "uv", "tool", "upgrade", "--all")
 }
 
 // isUvManagedInstall reports whether uv's self-update output indicates uv

@@ -132,3 +132,18 @@ func (p *MasProvider) SetListOutdated(fn func(ctx context.Context) (string, erro
 func IsUvManagedInstall(output string) bool {
 	return isUvManagedInstall(output)
 }
+
+// SetCheckAvailable sets the `uv` availability override on a UvProvider for testing.
+func (p *UvProvider) SetCheckAvailable(fn func() bool) {
+	p.checkAvailable = fn
+}
+
+// SetRunSelfUpdate sets the `uv self update` override on a UvProvider for testing.
+func (p *UvProvider) SetRunSelfUpdate(fn func(ctx context.Context) (string, error)) {
+	p.runSelfUpdate = fn
+}
+
+// SetRunToolUpgrade sets the `uv tool upgrade --all` override on a UvProvider for testing.
+func (p *UvProvider) SetRunToolUpgrade(fn func(ctx context.Context) (string, error)) {
+	p.runToolUpgrade = fn
+}
