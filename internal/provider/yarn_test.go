@@ -49,7 +49,8 @@ func TestIsYarnBerry(t *testing.T) {
 		{"berry 2.0.0", "2.0.0", true},
 		{"trailing newline", "1.22.22\n", false},
 		{"empty", "", false},
-		{"malformed", "not-a-version", false},
+		{"no dot", "not-a-version", false},
+		{"non-numeric major", "v1.22.22", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
