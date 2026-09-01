@@ -14,7 +14,7 @@ func TestEditorMarketplace(t *testing.T) {
 		{"code", marketplace.VSMarketplace},
 		{"cursor", marketplace.OpenVSX},
 		{"kiro", marketplace.OpenVSX},
-		{"windsurf", marketplace.OpenVSX},
+		{"devin-desktop", marketplace.OpenVSX},
 		{"agy", marketplace.OpenVSX},
 		{"unknown-editor", marketplace.OpenVSX},
 	}
