@@ -1,3 +1,5 @@
+version: 2
+
 project_name: upkeep
 
 before:
@@ -18,11 +20,23 @@ builds:
       - -s -w
 
 archives:
-  - format: tar.gz
+  - formats: ["tar.gz"]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
   name_template: "checksums.txt"
+
+homebrew_casks:
+  - name: upkeep
+    repository:
+      owner: teknikqa
+      name: homebrew-upkeep
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Casks
+    homepage: "https://github.com/teknikqa/upkeep"
+    description: "A Go CLI tool that keeps your macOS development environment up to date"
+    binaries:
+      - upkeep
 
 changelog:
   sort: asc
