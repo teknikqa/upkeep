@@ -35,7 +35,7 @@ var rootCmd = &cobra.Command{
 	Args:  cobra.ArbitraryArgs,
 	Short: "A Go-based system updater for macOS",
 	Long: `upkeep is a shell-independent system updater for macOS that manages
-updates for Homebrew, npm, pip, Rust, VS Code extensions, and more.
+updates for Homebrew, npm, pip, Rust, uv, VS Code extensions, and more.
 
 Examples:
   upkeep                    # Update all available providers
@@ -144,6 +144,7 @@ func filterEnabledProviders(providers []provider.Provider, cfg *config.Config) [
 		"composer":  cfg.Providers.Composer.Enabled,
 		"pip":       cfg.Providers.Pip.Enabled,
 		"rust":      cfg.Providers.Rust.Enabled,
+		"uv":        cfg.Providers.Uv.Enabled,
 		"editor":    cfg.Providers.Editor.Enabled,
 		"omz":       cfg.Providers.Omz.Enabled,
 		"vim":       cfg.Providers.Vim.Enabled,
