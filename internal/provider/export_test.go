@@ -147,3 +147,78 @@ func (p *UvProvider) SetRunSelfUpdate(fn func(ctx context.Context) (string, erro
 func (p *UvProvider) SetRunToolUpgrade(fn func(ctx context.Context) (string, error)) {
 	p.runToolUpgrade = fn
 }
+
+// ParsePnpmOutdated exposes parsePnpmOutdated for testing.
+func ParsePnpmOutdated(jsonStr string) ([]OutdatedItem, error) {
+	return parsePnpmOutdated(jsonStr)
+}
+
+// IsPnpmGlobalBinNotInPath exposes isPnpmGlobalBinNotInPath for testing.
+func IsPnpmGlobalBinNotInPath(output string) bool {
+	return isPnpmGlobalBinNotInPath(output)
+}
+
+// IsPnpmNoGlobalManifest exposes isPnpmNoGlobalManifest for testing.
+func IsPnpmNoGlobalManifest(output string) bool {
+	return isPnpmNoGlobalManifest(output)
+}
+
+// SetCheckAvailable sets the `pnpm` availability override on a PnpmProvider for testing.
+func (p *PnpmProvider) SetCheckAvailable(fn func() bool) {
+	p.checkAvailable = fn
+}
+
+// SetRunOutdated sets the `pnpm outdated -g` override on a PnpmProvider for testing.
+func (p *PnpmProvider) SetRunOutdated(fn func(ctx context.Context) (stdout, stderr string, err error)) {
+	p.runOutdated = fn
+}
+
+// SetRunUpdate sets the `pnpm update -g` override on a PnpmProvider for testing.
+func (p *PnpmProvider) SetRunUpdate(fn func(ctx context.Context, names []string) (string, error)) {
+	p.runUpdate = fn
+}
+
+// SetCheckAvailable sets the `yarn` availability override on a YarnProvider for testing.
+func (p *YarnProvider) SetCheckAvailable(fn func() bool) {
+	p.checkAvailable = fn
+}
+
+// SetRunVersion sets the `yarn --version` override on a YarnProvider for testing.
+func (p *YarnProvider) SetRunVersion(fn func(ctx context.Context) (string, error)) {
+	p.runVersion = fn
+}
+
+// SetRunUpgrade sets the `yarn global upgrade` override on a YarnProvider for testing.
+func (p *YarnProvider) SetRunUpgrade(fn func(ctx context.Context) (string, error)) {
+	p.runUpgrade = fn
+}
+
+// IsYarnBerry exposes isYarnBerry for testing.
+func IsYarnBerry(version string) bool {
+	return isYarnBerry(version)
+}
+
+// ParseBunOutdatedTable exposes parseBunOutdatedTable for testing.
+func ParseBunOutdatedTable(output string) []OutdatedItem {
+	return parseBunOutdatedTable(output)
+}
+
+// IsBunNoGlobalLockfile exposes isBunNoGlobalLockfile for testing.
+func IsBunNoGlobalLockfile(output string) bool {
+	return isBunNoGlobalLockfile(output)
+}
+
+// SetCheckAvailable sets the `bun` availability override on a BunProvider for testing.
+func (p *BunProvider) SetCheckAvailable(fn func() bool) {
+	p.checkAvailable = fn
+}
+
+// SetRunOutdated sets the `bun outdated -g` override on a BunProvider for testing.
+func (p *BunProvider) SetRunOutdated(fn func(ctx context.Context) (stdout, stderr string, err error)) {
+	p.runOutdated = fn
+}
+
+// SetRunUpdate sets the `bun update -g` override on a BunProvider for testing.
+func (p *BunProvider) SetRunUpdate(fn func(ctx context.Context, names []string) (string, error)) {
+	p.runUpdate = fn
+}

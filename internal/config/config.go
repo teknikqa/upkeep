@@ -30,6 +30,9 @@ type ProvidersConfig struct {
 	Brew     BrewConfig     `yaml:"brew"`
 	BrewCask BrewCaskConfig `yaml:"brew-cask"`
 	Npm      NpmConfig      `yaml:"npm"`
+	Pnpm     PnpmConfig     `yaml:"pnpm"`
+	Yarn     YarnConfig     `yaml:"yarn"`
+	Bun      BunConfig      `yaml:"bun"`
 	Composer ComposerConfig `yaml:"composer"`
 	Pip      PipConfig      `yaml:"pip"`
 	Rust     RustConfig     `yaml:"rust"`
@@ -62,6 +65,21 @@ type BrewCaskConfig struct {
 type NpmConfig struct {
 	Enabled bool     `yaml:"enabled"`
 	Skip    []string `yaml:"skip"`
+}
+
+// PnpmConfig configures the pnpm provider.
+type PnpmConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
+// YarnConfig configures the Yarn provider.
+type YarnConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
+// BunConfig configures the bun provider.
+type BunConfig struct {
+	Enabled bool `yaml:"enabled"`
 }
 
 // ComposerConfig configures the Composer provider.
@@ -157,6 +175,9 @@ func Defaults() *Config {
 				AuthOverrides:   map[string]bool{},
 			},
 			Npm:      NpmConfig{Enabled: true},
+			Pnpm:     PnpmConfig{Enabled: true},
+			Yarn:     YarnConfig{Enabled: true},
+			Bun:      BunConfig{Enabled: true},
 			Composer: ComposerConfig{Enabled: true},
 			Pip: PipConfig{
 				Enabled:           true,
