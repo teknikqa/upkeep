@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-01
+
 ### Added
 
-- **pnpm, Yarn, and bun global packages** can now be scanned and updated via three new providers (`pnpm`, `yarn`, `bun`), alongside the existing `npm` provider. `yarn` (Yarn Classic) has no per-package outdated listing, so it runs a wholesale `yarn global upgrade`; `pnpm` gracefully skips with a message if `pnpm setup` hasn't added its global bin directory to `PATH` yet.
+- **pnpm, Yarn, and bun global packages** can now be scanned and updated via three new providers (`pnpm`, `yarn`, `bun`), alongside the existing `npm` provider. `yarn` (Yarn Classic) has no per-package outdated listing, so it runs a wholesale `yarn global upgrade`; `pnpm` gracefully skips with a message if `pnpm setup` hasn't added its global bin directory to `PATH` yet. `npm`/`pnpm`/`yarn` work the same whether installed directly or managed via Corepack. Yarn Berry (2.x+) is detected and skipped with a message, since it removed `yarn global` entirely.
 
 ## [0.10.0] - 2026-09-01
 
@@ -150,7 +152,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release**: GoReleaser for macOS amd64 + arm64 binaries
 - **Dependabot**: Weekly updates for Go modules and GitHub Actions
 
-[Unreleased]: https://github.com/teknikqa/upkeep/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/teknikqa/upkeep/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/teknikqa/upkeep/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/teknikqa/upkeep/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/teknikqa/upkeep/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/teknikqa/upkeep/compare/v0.8.0...v0.8.1
