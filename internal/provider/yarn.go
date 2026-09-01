@@ -125,7 +125,7 @@ func (p *YarnProvider) doUpgrade(ctx context.Context) (string, error) {
 }
 
 // isYarnBerry reports whether a `yarn --version` output (e.g. "1.22.22" or
-// "4.5.0") is Yarn Berry (major version 2+). An unparseable version fails
+// "4.5.0") is Yarn Berry (major version 2+). An unparsable version fails
 // open (returns false) so a version-check hiccup doesn't block Classic use.
 func isYarnBerry(version string) bool {
 	major, _, ok := strings.Cut(strings.TrimSpace(version), ".")
