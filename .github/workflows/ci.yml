@@ -10,8 +10,29 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - '.golangci.yml'
+              - '.github/workflows/**'
+
   test:
     name: Test (Go ${{ matrix.go-version }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-latest
     strategy:
       fail-fast: false
@@ -54,6 +75,8 @@ jobs:
 
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-latest
     env:
       GOTOOLCHAIN: local
@@ -100,6 +123,8 @@ jobs:
 
   vulncheck:
     name: Vulnerability Check
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

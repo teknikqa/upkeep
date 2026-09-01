@@ -15,8 +15,29 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - '.github/workflows/**'
+
   analyze:
     name: CodeQL Analysis
+    needs: changes
+    if: always() && (github.event_name == 'schedule' || needs.changes.outputs.code == 'true')
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
