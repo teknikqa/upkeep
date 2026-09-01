@@ -9,6 +9,8 @@ import (
 	"github.com/teknikqa/upkeep/internal/provider"
 )
 
+var yarnPseudoItem = []provider.OutdatedItem{{Name: "yarn global (all packages)", LatestVersion: "upgrade-all"}}
+
 func TestYarnProvider_Name(t *testing.T) {
 	p := provider.NewYarnProvider(config.YarnConfig{Enabled: true}, nil)
 	if p.Name() != "yarn" {
@@ -36,6 +38,28 @@ func TestYarnProvider_Registered(t *testing.T) {
 	}
 }
 
+func TestIsYarnBerry(t *testing.T) {
+	cases := []struct {
+		name    string
+		version string
+		want    bool
+	}{
+		{"classic 1.22.22", "1.22.22", false},
+		{"berry 4.5.0", "4.5.0", true},
+		{"berry 2.0.0", "2.0.0", true},
+		{"trailing newline", "1.22.22\n", false},
+		{"empty", "", false},
+		{"malformed", "not-a-version", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := provider.IsYarnBerry(tc.version); got != tc.want {
+				t.Errorf("IsYarnBerry(%q) = %v, want %v", tc.version, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestYarnProvider_Scan_NotAvailable(t *testing.T) {
 	p := provider.NewYarnProvider(config.YarnConfig{Enabled: true}, nil)
 	p.SetCheckAvailable(func() bool { return false })
@@ -46,11 +70,12 @@ func TestYarnProvider_Scan_NotAvailable(t *testing.T) {
 	}
 }
 
-func TestYarnProvider_Scan_Available(t *testing.T) {
-	// yarn (classic) has no per-package outdated listing for global scope,
+func TestYarnProvider_Scan_Classic(t *testing.T) {
+	// yarn Classic has no per-package outdated listing for global scope,
 	// so Scan always surfaces exactly one pseudo item when available.
 	p := provider.NewYarnProvider(config.YarnConfig{Enabled: true}, nil)
 	p.SetCheckAvailable(func() bool { return true })
+	p.SetRunVersion(func(_ context.Context) (string, error) { return "1.22.22", nil })
 
 	result := p.Scan(context.Background())
 	if !result.Available {
@@ -64,11 +89,31 @@ func TestYarnProvider_Scan_Available(t *testing.T) {
 	}
 }
 
-func TestYarnProvider_Update_NotAvailable(t *testing.T) {
+func TestYarnProvider_Scan_Berry(t *testing.T) {
+	// Yarn Berry removed `yarn global` — Scan should skip with a message
+	// rather than surface a pseudo item that would fail opaquely at Update.
 	p := provider.NewYarnProvider(config.YarnConfig{Enabled: true}, nil)
-	p.SetCheckAvailable(func() bool { return false })
+	p.SetCheckAvailable(func() bool { return true })
+	p.SetRunVersion(func(_ context.Context) (string, error) { return "4.5.0", nil })
+
+	result := p.Scan(context.Background())
+	if !result.Available {
+		t.Fatal("expected Available=true")
+	}
+	if len(result.Outdated) != 0 {
+		t.Errorf("expected 0 outdated (Berry unsupported), got %d: %+v", len(result.Outdated), result.Outdated)
+	}
+	if result.Message == "" {
+		t.Error("expected a non-empty message explaining Berry is unsupported")
+	}
+}
+
+func TestYarnProvider_Update_NoItems(t *testing.T) {
+	// Scan is the sole gate (unavailable, or Berry active, both yield 0
+	// items) — Update must not run doUpgrade when items is empty.
+	p := provider.NewYarnProvider(config.YarnConfig{Enabled: true}, nil)
 	p.SetRunUpgrade(func(_ context.Context) (string, error) {
-		t.Fatal("upgrade should not run when yarn is unavailable")
+		t.Fatal("upgrade should not run with no items")
 		return "", nil
 	})
 
@@ -92,12 +137,11 @@ func TestYarnProvider_Update(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := provider.NewYarnProvider(config.YarnConfig{Enabled: true}, nil)
-			p.SetCheckAvailable(func() bool { return true })
 			p.SetRunUpgrade(func(_ context.Context) (string, error) {
 				return "", tt.err
 			})
 
-			result := p.Update(context.Background(), nil)
+			result := p.Update(context.Background(), yarnPseudoItem)
 
 			gotUpdated := len(result.Updated) == 1 && result.Updated[0] == "yarn-global"
 			gotFailed := len(result.Failed) == 1 && result.Failed[0] == "yarn-global"

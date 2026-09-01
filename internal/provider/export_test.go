@@ -183,9 +183,19 @@ func (p *YarnProvider) SetCheckAvailable(fn func() bool) {
 	p.checkAvailable = fn
 }
 
+// SetRunVersion sets the `yarn --version` override on a YarnProvider for testing.
+func (p *YarnProvider) SetRunVersion(fn func(ctx context.Context) (string, error)) {
+	p.runVersion = fn
+}
+
 // SetRunUpgrade sets the `yarn global upgrade` override on a YarnProvider for testing.
 func (p *YarnProvider) SetRunUpgrade(fn func(ctx context.Context) (string, error)) {
 	p.runUpgrade = fn
+}
+
+// IsYarnBerry exposes isYarnBerry for testing.
+func IsYarnBerry(version string) bool {
+	return isYarnBerry(version)
 }
 
 // ParseBunOutdatedTable exposes parseBunOutdatedTable for testing.

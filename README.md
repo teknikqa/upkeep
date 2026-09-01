@@ -30,7 +30,7 @@ A Go CLI tool that keeps your macOS development environment up to date.
 | `brew-cask` | Homebrew casks | [Homebrew](https://brew.sh) |
 | `npm` | Globally-installed npm packages | `npm` |
 | `pnpm` | Globally-installed pnpm packages | `pnpm` — requires `pnpm setup` to have added its global bin dir to `PATH`; otherwise this provider reports 0 outdated |
-| `yarn` | Globally-installed Yarn (classic) packages | `yarn` — Yarn Classic has no per-package outdated listing, so this runs a wholesale `yarn global upgrade` |
+| `yarn` | Globally-installed Yarn (classic) packages | `yarn` — Yarn Classic (1.x) has no per-package outdated listing, so this runs a wholesale `yarn global upgrade`; Yarn Berry (2.x+) removed `yarn global` entirely, so this provider detects Berry and skips with a message instead |
 | `bun` | Globally-installed bun packages | `bun` |
 | `composer` | Globally-installed Composer packages | `composer` |
 | `pip` | pip3 + pipx packages | `pip3` and/or `pipx` |
@@ -44,7 +44,7 @@ A Go CLI tool that keeps your macOS development environment up to date.
 
 Run `upkeep --list` to see which providers are currently registered, or `upkeep <name> [<name> ...]` to update specific ones (e.g. `upkeep brew npm`). A provider that's missing its required tool is reported as unavailable and skipped rather than erroring.
 
-`npm`/`pnpm`/`yarn` work the same whether installed directly or managed via [Corepack](https://nodejs.org/api/corepack.html) (`corepack enable`) — Corepack shims them onto `PATH` as regular executables, so no special handling is needed. Corepack's default (unpinned) `yarn` resolves to Yarn Classic (1.x), matching what the `yarn` provider expects.
+`npm`/`pnpm`/`yarn` work the same whether installed directly or managed via [Corepack](https://nodejs.org/api/corepack.html) (`corepack enable`) — Corepack shims them onto `PATH` as regular executables, so no special handling is needed. Corepack's default (unpinned) `yarn` resolves to Yarn Classic (1.x); if you've switched to Berry (`yarn set version berry`, or a pinned `packageManager`), the `yarn` provider detects it and skips global updates with an explanatory message rather than failing.
 
 ## Installation
 
