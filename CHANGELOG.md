@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The `editor` provider now checks for `devin-desktop` instead of `windsurf` in its default editor list — Cognition rebranded Windsurf into Devin Desktop in June 2026, and the old Windsurf IDE/CLI no longer exists. If you've pinned `providers.editor.editors` in your config, replace `windsurf` with `devin-desktop`.
+
 ## [0.11.0] - 2026-09-01
 
 ### Added

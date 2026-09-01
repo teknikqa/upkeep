@@ -197,7 +197,7 @@ func Defaults() *Config {
 			},
 			Editor: EditorConfig{
 				Enabled: true,
-				Editors: []string{"code", "cursor", "kiro", "windsurf", "agy"},
+				Editors: []string{"code", "cursor", "kiro", "devin-desktop", "agy"},
 				Timeout: 300,
 			},
 			Omz: OmzConfig{Enabled: true},

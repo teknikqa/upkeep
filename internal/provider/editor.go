@@ -31,7 +31,7 @@ func (p *EditorProvider) DependsOn() []string { return nil }
 func (p *EditorProvider) SubGroups() []string {
 	editors := p.cfg.Editors
 	if len(editors) == 0 {
-		editors = []string{"code", "cursor", "kiro", "windsurf", "agy"}
+		editors = []string{"code", "cursor", "kiro", "devin-desktop", "agy"}
 	}
 	return editors
 }
@@ -43,7 +43,7 @@ func (p *EditorProvider) SubGroups() []string {
 func (p *EditorProvider) Scan(ctx context.Context) ScanResult {
 	editors := p.cfg.Editors
 	if len(editors) == 0 {
-		editors = []string{"code", "cursor", "kiro", "windsurf", "agy"}
+		editors = []string{"code", "cursor", "kiro", "devin-desktop", "agy"}
 	}
 
 	found := false
@@ -132,7 +132,7 @@ func (p *EditorProvider) Scan(ctx context.Context) ScanResult {
 func (p *EditorProvider) Update(ctx context.Context, _ []OutdatedItem) UpdateResult {
 	editors := p.cfg.Editors
 	if len(editors) == 0 {
-		editors = []string{"code", "cursor", "kiro", "windsurf", "agy"}
+		editors = []string{"code", "cursor", "kiro", "devin-desktop", "agy"}
 	}
 
 	start := time.Now()
@@ -249,7 +249,7 @@ func compareVersions(installed []marketplace.Extension, latest map[string]market
 func init() {
 	Register(NewEditorProvider(config.EditorConfig{
 		Enabled: true,
-		Editors: []string{"code", "cursor", "kiro", "windsurf", "agy"},
+		Editors: []string{"code", "cursor", "kiro", "devin-desktop", "agy"},
 		Timeout: 300,
 	}, nil))
 }

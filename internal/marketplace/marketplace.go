@@ -56,7 +56,7 @@ func EditorMarketplace(editor string) MarketplaceType {
 	case "code":
 		return VSMarketplace
 	default:
-		// cursor, kiro, windsurf, agy and anything unknown → Open VSX
+		// cursor, kiro, devin-desktop, agy and anything unknown → Open VSX
 		return OpenVSX
 	}
 }
