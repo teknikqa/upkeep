@@ -12,7 +12,7 @@ A Go CLI tool that keeps your macOS development environment up to date.
 
 ## Features
 
-- **12 providers** covering Homebrew, npm, Composer, pip, Rust, uv, editor extensions, Oh My Zsh, Vim, Vagrant, and the Mac App Store — see [Providers](#providers)
+- **15 providers** covering Homebrew, npm/pnpm/yarn/bun, Composer, pip, Rust, uv, editor extensions, Oh My Zsh, Vim, Vagrant, and the Mac App Store — see [Providers](#providers)
 - **Scan → Confirm → Execute → Report pipeline** with pterm TUI output
 - **Parallel execution** with configurable parallelism and dependency ordering (brew-cask waits for brew)
 - **Batched upgrades**: package managers that accept multiple packages (Homebrew, npm, pip) upgrade everything in a single command — faster, and the only way to parallelize Homebrew, whose global lock blocks concurrent processes. A failing batch automatically re-runs each package individually so failures stay isolated. Editor extensions update concurrently across editors.
@@ -29,6 +29,9 @@ A Go CLI tool that keeps your macOS development environment up to date.
 | `brew` | Homebrew formulae | [Homebrew](https://brew.sh) |
 | `brew-cask` | Homebrew casks | [Homebrew](https://brew.sh) |
 | `npm` | Globally-installed npm packages | `npm` |
+| `pnpm` | Globally-installed pnpm packages | `pnpm` — requires `pnpm setup` to have added its global bin dir to `PATH`; otherwise this provider reports 0 outdated |
+| `yarn` | Globally-installed Yarn (classic) packages | `yarn` — Yarn Classic has no per-package outdated listing, so this runs a wholesale `yarn global upgrade` |
+| `bun` | Globally-installed bun packages | `bun` |
 | `composer` | Globally-installed Composer packages | `composer` |
 | `pip` | pip3 + pipx packages | `pip3` and/or `pipx` |
 | `rust` | Rust toolchains (rustup) and cargo-installed binaries | `rustup`, [`cargo-update`](https://github.com/nabijaczleweli/cargo-update) |
