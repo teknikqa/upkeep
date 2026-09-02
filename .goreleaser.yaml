@@ -62,3 +62,7 @@ release:
     name: upkeep
   draft: false
   prerelease: auto
+  # release-please creates the tag + GitHub Release (with the changelog as
+  # its body) before this tag push triggers GoReleaser — keep its notes
+  # intact and only attach build artifacts to the existing release.
+  mode: keep-existing
