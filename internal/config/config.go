@@ -42,6 +42,7 @@ type ProvidersConfig struct {
 	Vim      VimConfig      `yaml:"vim"`
 	Vagrant  VagrantConfig  `yaml:"vagrant"`
 	Mas      MasConfig      `yaml:"mas"`
+	Macports MacportsConfig `yaml:"macports"`
 }
 
 // BrewConfig configures the Homebrew formulae provider.
@@ -142,6 +143,12 @@ type MasConfig struct {
 	Skip    []string `yaml:"skip"`
 }
 
+// MacportsConfig configures the MacPorts (port) provider.
+type MacportsConfig struct {
+	Enabled bool     `yaml:"enabled"`
+	Skip    []string `yaml:"skip"`
+}
+
 // NotificationsConfig configures macOS notifications.
 type NotificationsConfig struct {
 	Enabled bool   `yaml:"enabled"`
@@ -207,8 +214,9 @@ func Defaults() *Config {
 				PathogenDir:  "~/.vim/autoload",
 				BundlesDir:   "~/.vim/bundle",
 			},
-			Vagrant: VagrantConfig{Enabled: true, Notify: true},
-			Mas:     MasConfig{Enabled: true},
+			Vagrant:  VagrantConfig{Enabled: true, Notify: true},
+			Mas:      MasConfig{Enabled: true},
+			Macports: MacportsConfig{Enabled: true},
 		},
 		Notifications: NotificationsConfig{
 			Enabled: true,

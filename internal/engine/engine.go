@@ -316,6 +316,7 @@ func buildSkipLists(cfg *config.Config) map[string]map[string]bool {
 	addSkips("brew-cask", cfg.Providers.BrewCask.Skip)
 	addSkips("npm", cfg.Providers.Npm.Skip)
 	addSkips("mas", cfg.Providers.Mas.Skip)
+	addSkips("macports", cfg.Providers.Macports.Skip)
 	return result
 }
 

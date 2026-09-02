@@ -12,7 +12,7 @@ A Go CLI tool that keeps your macOS development environment up to date.
 
 ## Features
 
-- **15 providers** covering Homebrew, npm/pnpm/yarn/bun, Composer, pip, Rust, uv, editor extensions, Oh My Zsh, Vim, Vagrant, and the Mac App Store — see [Providers](#providers)
+- **16 providers** covering Homebrew, npm/pnpm/yarn/bun, Composer, pip, Rust, uv, editor extensions, Oh My Zsh, Vim, Vagrant, MacPorts, and the Mac App Store — see [Providers](#providers)
 - **Scan → Confirm → Execute → Report pipeline** with pterm TUI output
 - **Parallel execution** with configurable parallelism and dependency ordering (brew-cask waits for brew)
 - **Batched upgrades**: package managers that accept multiple packages (Homebrew, npm, pip) upgrade everything in a single command — faster, and the only way to parallelize Homebrew, whose global lock blocks concurrent processes. A failing batch automatically re-runs each package individually so failures stay isolated. Editor extensions update concurrently across editors.
@@ -31,6 +31,7 @@ A Go CLI tool that keeps your macOS development environment up to date.
 | `bun` | Globally-installed bun packages | `bun` |
 | `composer` | Globally-installed Composer packages | `composer` |
 | `editor` | Installed extensions for VS Code, Cursor, Kiro, Devin Desktop, and Agy | the editor's CLI (`code`, `cursor`, `kiro`, `devin-desktop`, or `agy`) — Windsurf was discontinued after Cognition rebranded it to Devin Desktop in June 2026 |
+| `macports` | MacPorts-installed ports | [MacPorts](https://www.macports.org) — every upgrade needs admin auth; `upkeep` caches sudo credentials once per run rather than prompting per port |
 | `mas` | Apps installed from the Mac App Store | [`mas`](https://github.com/mas-cli/mas) (`brew install mas`) — every update needs admin auth; `upkeep` caches sudo credentials once per run rather than prompting per app |
 | `npm` | Globally-installed npm packages | `npm` |
 | `omz` | Oh My Zsh itself | Oh My Zsh installed |
