@@ -17,3 +17,6 @@ coverage.html
 
 # Weave agent state
 .weave/
+
+# Node (commitlint)
+node_modules/
