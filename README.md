@@ -55,6 +55,14 @@ Run `upkeep --list` to see which providers are currently registered, or `upkeep 
 brew install teknikqa/upkeep/upkeep
 ```
 
+### MacPorts
+
+MacPorts has no "tap" concept, so this is a self-hosted port repo you add as a source — see [teknikqa/macports-upkeep](https://github.com/teknikqa/macports-upkeep) for setup, then:
+
+```bash
+sudo port install upkeep
+```
+
 ### From a release
 
 Download the latest archive from the [releases page](https://github.com/teknikqa/upkeep/releases/latest):
