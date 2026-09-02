@@ -48,6 +48,12 @@ Run `upkeep --list` to see which providers are currently registered, or `upkeep 
 
 ## Installation
 
+### Homebrew
+
+```bash
+brew install teknikqa/upkeep/upkeep
+```
+
 ### From a release
 
 Download the latest archive from the [releases page](https://github.com/teknikqa/upkeep/releases/latest):

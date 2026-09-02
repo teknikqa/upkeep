@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Homebrew installation**: `upkeep` can now be installed via `brew install teknikqa/upkeep/upkeep`. Releases are published as a Homebrew cask to the [teknikqa/homebrew-upkeep](https://github.com/teknikqa/homebrew-upkeep) tap automatically by GoReleaser.
+
 ### Changed
 
 - The `editor` provider now checks for `devin-desktop` instead of `windsurf` in its default editor list — Cognition rebranded Windsurf into Devin Desktop in June 2026, and the old Windsurf IDE/CLI no longer exists. If you've pinned `providers.editor.editors` in your config, replace `windsurf` with `devin-desktop`.
