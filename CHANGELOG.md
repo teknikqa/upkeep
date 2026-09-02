@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Homebrew installation**: `upkeep` can now be installed via `brew install teknikqa/upkeep/upkeep`. Releases are published as a Homebrew cask to the [teknikqa/homebrew-upkeep](https://github.com/teknikqa/homebrew-upkeep) tap automatically by GoReleaser.
 - **MacPorts ports** can now be scanned and updated via a new `macports` provider. Like `mas`, every upgrade needs admin auth, so `upkeep` caches sudo credentials once per run rather than prompting per port.
+- **MacPorts installation**: `upkeep` itself can now be installed via `sudo port install upkeep` from a self-hosted port repo, [teknikqa/macports-upkeep](https://github.com/teknikqa/macports-upkeep). The release workflow updates its Portfile's version and checksums on every tag.
 
 ### Changed
 
