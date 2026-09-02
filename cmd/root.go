@@ -153,6 +153,7 @@ func filterEnabledProviders(providers []provider.Provider, cfg *config.Config) [
 		"vim":       cfg.Providers.Vim.Enabled,
 		"vagrant":   cfg.Providers.Vagrant.Enabled,
 		"mas":       cfg.Providers.Mas.Enabled,
+		"macports":  cfg.Providers.Macports.Enabled,
 	}
 
 	var result []provider.Provider

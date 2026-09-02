@@ -128,6 +128,16 @@ func (p *MasProvider) SetListOutdated(fn func(ctx context.Context) (string, erro
 	p.listOutdated = fn
 }
 
+// ParseMacportsOutdated exposes parseMacportsOutdated for testing.
+func ParseMacportsOutdated(output string) []OutdatedItem {
+	return parseMacportsOutdated(output)
+}
+
+// SetListOutdated sets the `port outdated` query override on a MacportsProvider for testing.
+func (p *MacportsProvider) SetListOutdated(fn func(ctx context.Context) (string, error)) {
+	p.listOutdated = fn
+}
+
 // IsUvManagedInstall exposes isUvManagedInstall for testing.
 func IsUvManagedInstall(output string) bool {
 	return isUvManagedInstall(output)
