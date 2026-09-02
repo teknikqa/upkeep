@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-02
+
 ### Added
 
 - **Homebrew installation**: `upkeep` can now be installed via `brew install teknikqa/upkeep/upkeep`. Releases are published as a Homebrew cask to the [teknikqa/homebrew-upkeep](https://github.com/teknikqa/homebrew-upkeep) tap automatically by GoReleaser.
@@ -162,7 +164,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release**: GoReleaser for macOS amd64 + arm64 binaries
 - **Dependabot**: Weekly updates for Go modules and GitHub Actions
 
-[Unreleased]: https://github.com/teknikqa/upkeep/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/teknikqa/upkeep/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/teknikqa/upkeep/compare/v0.11.0...v1.0.0
 [0.11.0]: https://github.com/teknikqa/upkeep/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/teknikqa/upkeep/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/teknikqa/upkeep/compare/v0.8.1...v0.9.0
