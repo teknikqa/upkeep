@@ -52,12 +52,12 @@ Run `upkeep --list` to see which providers are currently registered, or `upkeep 
 ### Homebrew
 
 ```bash
-brew install teknikqa/upkeep/upkeep
+brew install teknikqa/tap/upkeep
 ```
 
 ### MacPorts
 
-MacPorts has no "tap" concept, so this is a self-hosted port repo you add as a source — see [teknikqa/macports-upkeep](https://github.com/teknikqa/macports-upkeep) for setup, then:
+MacPorts has no "tap" concept, so this is a self-hosted port repo you add as a source — see [teknikqa/macports-ports](https://github.com/teknikqa/macports-ports) for setup, then:
 
 ```bash
 sudo port install upkeep

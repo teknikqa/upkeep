@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Updates the version and checksums in teknikqa/macports-upkeep's Portfile
+# Updates the version and checksums in teknikqa/macports-ports's Portfile
 # for a new upkeep release, then commits and pushes. Run after a tag is
 # pushed; MACPORTS_TAP_GITHUB_TOKEN must have contents:write on that repo.
 set -euo pipefail
@@ -7,7 +7,7 @@ set -euo pipefail
 VERSION="${1:?usage: update-macports-portfile.sh <version, e.g. 0.11.1>}"
 : "${MACPORTS_TAP_GITHUB_TOKEN:?MACPORTS_TAP_GITHUB_TOKEN must be set}"
 
-TAP_REPO="teknikqa/macports-upkeep"
+TAP_REPO="teknikqa/macports-ports"
 PORTFILE="sysutils/upkeep/Portfile"
 RELEASE_BASE="https://github.com/teknikqa/upkeep/releases/download/v${VERSION}"
 
