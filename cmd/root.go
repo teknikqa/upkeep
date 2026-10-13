@@ -61,9 +61,12 @@ Examples:
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
 	if err := execute(); err != nil {
-		os.Exit(1)
+		osExit(1)
 	}
 }
+
+// osExit is swapped in tests so Execute's failure path can run in-process.
+var osExit = os.Exit
 
 // execute runs the root command with a signal-aware context.
 func execute() error {

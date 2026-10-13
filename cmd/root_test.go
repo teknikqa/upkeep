@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"io"
+	"os"
 	"syscall"
 	"testing"
 	"time"
@@ -129,5 +131,24 @@ func TestExecute_RunsRootCommand(t *testing.T) {
 	})
 	if err := execute(); err != nil {
 		t.Fatalf("execute: %v", err)
+	}
+}
+
+func TestExecute_ExitsNonZeroOnError(t *testing.T) {
+	rootCmd.SetArgs([]string{"--bogus-flag"})
+	rootCmd.SetOut(io.Discard)
+	rootCmd.SetErr(io.Discard)
+	code := -1
+	osExit = func(c int) { code = c }
+	t.Cleanup(func() {
+		rootCmd.SetArgs(nil)
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+		osExit = os.Exit
+	})
+
+	Execute()
+	if code != 1 {
+		t.Errorf("expected exit code 1, got %d", code)
 	}
 }
