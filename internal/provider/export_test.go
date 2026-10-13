@@ -105,6 +105,16 @@ func ParseVagrantVersion(output string) (installed, latest string) {
 	return parseVagrantVersion(output)
 }
 
+// ParseVagrantPluginList exposes parseVagrantPluginList for testing.
+func ParseVagrantPluginList(output string) []OutdatedItem {
+	return parseVagrantPluginList(output)
+}
+
+// SetGemsURL points the provider's RubyGems lookups at a test server.
+func (p *VagrantProvider) SetGemsURL(url string) {
+	p.gemsURL = url
+}
+
 // ParseExtensionList exposes parseExtensionList for testing.
 func ParseExtensionList(output string) []marketplace.Extension {
 	return parseExtensionList(output)
