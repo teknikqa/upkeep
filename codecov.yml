@@ -1,0 +1,2 @@
+ignore:
+  - internal/ui/prompt.go # pterm glue; needs a real terminal

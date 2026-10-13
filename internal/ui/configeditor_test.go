@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/teknikqa/upkeep/internal/config"
@@ -148,11 +150,15 @@ func TestCopyConfig_DeepCopy(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Providers.Brew.Skip = []string{"formula1", "formula2"}
 	cfg.Providers.BrewCask.AuthOverrides = map[string]bool{"app1": true}
+	cfg.Providers.Mas.Skip = []string{"Xcode"}
+	cfg.Providers.Macports.Skip = []string{"python312"}
 
 	cp := copyConfig(cfg)
 
 	// Mutate the copy.
 	cp.Providers.Brew.Skip[0] = "MODIFIED"
+	cp.Providers.Mas.Skip[0] = "MODIFIED"
+	cp.Providers.Macports.Skip[0] = "MODIFIED"
 	cp.Providers.BrewCask.AuthOverrides["app1"] = false
 
 	// Original must be unchanged.
@@ -161,6 +167,12 @@ func TestCopyConfig_DeepCopy(t *testing.T) {
 	}
 	if !cfg.Providers.BrewCask.AuthOverrides["app1"] {
 		t.Errorf("BrewCask.AuthOverrides[\"app1\"] was mutated")
+	}
+	if cfg.Providers.Mas.Skip[0] != "Xcode" {
+		t.Errorf("Mas.Skip[0] was mutated: %q", cfg.Providers.Mas.Skip[0])
+	}
+	if cfg.Providers.Macports.Skip[0] != "python312" {
+		t.Errorf("Macports.Skip[0] was mutated: %q", cfg.Providers.Macports.Skip[0])
 	}
 }
 
@@ -193,5 +205,207 @@ func TestStatusEmoji_Skipped(t *testing.T) {
 func TestStatusEmoji_Unknown(t *testing.T) {
 	if got := statusEmoji("anything-else"); got != "❓" {
 		t.Errorf("expected ❓, got %q", got)
+	}
+}
+
+// --- Menu navigation (scripted prompts) ---
+
+// scriptPrompts replaces the prompt seams for one test. Each select answer is
+// matched as a prefix of the offered options; confirms are returned in order.
+func scriptPrompts(t *testing.T, selects []string, confirms ...bool) {
+	t.Helper()
+	origSelect, origConfirm, origInteractive := selectOption, confirmBool, isInteractive
+	isInteractive = func() bool { return true }
+	t.Cleanup(func() {
+		selectOption, confirmBool, isInteractive = origSelect, origConfirm, origInteractive
+		if len(selects) > 0 || len(confirms) > 0 {
+			t.Errorf("unused script: selects=%v confirms=%v", selects, confirms)
+		}
+	})
+	selectOption = func(label string, options []string) (string, error) {
+		if len(selects) == 0 {
+			t.Fatalf("unexpected select %q", label)
+		}
+		want := selects[0]
+		selects = selects[1:]
+		for _, o := range options {
+			if startsWith(o, want) {
+				return o, nil
+			}
+		}
+		t.Fatalf("%q: no option starting with %q in %v", label, want, options)
+		return "", nil
+	}
+	confirmBool = func(label string, _ bool) (bool, error) {
+		if len(confirms) == 0 {
+			t.Fatalf("unexpected confirm %q", label)
+		}
+		v := confirms[0]
+		confirms = confirms[1:]
+		return v, nil
+	}
+}
+
+func TestRunConfigEditor_RequiresTTY(t *testing.T) {
+	scriptPrompts(t, nil)
+	isInteractive = func() bool { return false }
+
+	if _, _, err := RunConfigEditor(config.Defaults()); err == nil {
+		t.Fatal("expected error without a TTY")
+	}
+}
+
+func TestRunConfigEditor_SaveAfterVisitingSections(t *testing.T) {
+	scriptPrompts(t, []string{
+		"General", "Back",
+		"Providers", "pnpm", "Enabled", "Back", "Back",
+		"Notifications", "Back",
+		"Logging", "Back",
+		"Save & Exit",
+	}, false)
+	orig := config.Defaults()
+
+	edited, save, err := RunConfigEditor(orig)
+	if err != nil || !save {
+		t.Fatalf("save=%v err=%v", save, err)
+	}
+	if edited.Providers.Pnpm.Enabled {
+		t.Error("edit was not applied")
+	}
+	if !orig.Providers.Pnpm.Enabled {
+		t.Error("original config was mutated")
+	}
+}
+
+func TestRunConfigEditor_InvalidConfigBlocksSave(t *testing.T) {
+	scriptPrompts(t, []string{"Save & Exit", "Exit without saving"})
+	cfg := config.Defaults()
+	cfg.Parallelism = 0
+
+	edited, save, err := RunConfigEditor(cfg)
+	if err != nil || save || edited != nil {
+		t.Fatalf("edited=%v save=%v err=%v", edited, save, err)
+	}
+}
+
+func TestRunConfigEditor_PropagatesSelectError(t *testing.T) {
+	scriptPrompts(t, nil)
+	selectOption = func(string, []string) (string, error) { return "", errors.New("boom") }
+
+	if _, _, err := RunConfigEditor(config.Defaults()); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestEditProvidersSection_OpensEveryProvider(t *testing.T) {
+	providers := []string{
+		"Brew Cask", "Brew", "npm", "pnpm", "Yarn", "Bun", "Composer", "pip",
+		"Rust", "uv", "Editor Extensions", "Oh My Zsh", "Vim", "Vagrant",
+		"Mac App Store", "MacPorts",
+	}
+	var script []string
+	for _, p := range providers {
+		script = append(script, p, "Back")
+	}
+	scriptPrompts(t, append(script, "Back"))
+
+	if err := editProvidersSection(config.Defaults()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEditProvidersSection_EditsNewProviders(t *testing.T) {
+	cfg := config.Defaults()
+	scriptPrompts(t, []string{
+		"pnpm", "Enabled", "Back",
+		"Yarn", "Enabled", "Back",
+		"Bun", "Enabled", "Back",
+		"uv", "Self Update", "Tools", "Enabled", "Back",
+		"Mac App Store", "Enabled", "Skip", "Back", "Back",
+		"MacPorts", "Enabled", "Back",
+		"Editor Extensions", "Enabled", "Back",
+		"Back",
+	}, false, false, false, false, false, false, false, false, false)
+
+	if err := editProvidersSection(cfg); err != nil {
+		t.Fatal(err)
+	}
+	p := cfg.Providers
+	for name, enabled := range map[string]bool{
+		"pnpm": p.Pnpm.Enabled, "yarn": p.Yarn.Enabled, "bun": p.Bun.Enabled,
+		"uv": p.Uv.Enabled, "uv self_update": p.Uv.SelfUpdate, "uv tool": p.Uv.Tool,
+		"mas": p.Mas.Enabled, "macports": p.Macports.Enabled,
+		"editor": p.Editor.Enabled,
+	} {
+		if enabled {
+			t.Errorf("%s still enabled", name)
+		}
+	}
+}
+
+func TestEditProvidersSection_PropagatesPromptErrors(t *testing.T) {
+	scriptPrompts(t, []string{"Bun", "Enabled"})
+	confirmBool = func(string, bool) (bool, error) { return false, errors.New("boom") }
+
+	if err := editProvidersSection(config.Defaults()); err == nil {
+		t.Fatal("expected error from failed confirm")
+	}
+}
+
+func TestEditSections_Back(t *testing.T) {
+	for name, edit := range map[string]func(*config.Config) error{
+		"general":       editGeneralSection,
+		"notifications": editNotificationsSection,
+		"logging":       editLoggingSection,
+	} {
+		t.Run(name, func(t *testing.T) {
+			scriptPrompts(t, []string{"Back"})
+			if err := edit(config.Defaults()); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestProviderEditors_PropagateSelectErrors(t *testing.T) {
+	scriptPrompts(t, nil)
+	selectOption = func(string, []string) (string, error) { return "", errors.New("boom") }
+	var on bool
+	var skip []string
+	cfg := config.Defaults()
+
+	for name, err := range map[string]error{
+		"enabled-only": editEnabledOnlyProvider("Bun", &on),
+		"enabled-skip": editEnabledSkipProvider("MacPorts", "Skip ports", &on, &skip),
+		"uv":           editUvProvider(cfg),
+		"providers":    editProvidersSection(cfg),
+	} {
+		if err == nil {
+			t.Errorf("%s: expected error", name)
+		}
+	}
+}
+
+func TestEditStringSlice_RemoveItem(t *testing.T) {
+	scriptPrompts(t, []string{"Remove item", "b", "Back"})
+
+	got, err := editStringSlice("Skip", []string{"a", "b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"a"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestEditMapStringBool_ToggleAndRemove(t *testing.T) {
+	scriptPrompts(t, []string{"Toggle entry", "a", "Remove entry", "b", "Back"})
+
+	got, err := editMapStringBool("Overrides", map[string]bool{"a": true, "b": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := map[string]bool{"a": false}; !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }
