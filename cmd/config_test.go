@@ -132,3 +132,93 @@ func TestConfigResetCmd_WritesDefaults(t *testing.T) {
 		t.Errorf("expected parallelism=4 after reset, got %d", loaded.Parallelism)
 	}
 }
+
+func writeInvalidConfig(t *testing.T) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("parallelism: [not, a, number\n"), 0o600); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	old := cfgFile
+	cfgFile = path
+	t.Cleanup(func() { cfgFile = old })
+}
+
+func TestConfigShowCmd_InvalidConfig(t *testing.T) {
+	writeInvalidConfig(t)
+	err := configShowCmd.RunE(configShowCmd, nil)
+	if err == nil || !strings.Contains(err.Error(), "loading config") {
+		t.Fatalf("expected loading config error, got %v", err)
+	}
+}
+
+func TestConfigEditCmd_InvalidConfig(t *testing.T) {
+	writeInvalidConfig(t)
+	err := configEditCmd.RunE(configEditCmd, nil)
+	if err == nil || !strings.Contains(err.Error(), "loading config") {
+		t.Fatalf("expected loading config error, got %v", err)
+	}
+}
+
+// setConfigReset points cfgFile at path and sets the global --yes flag.
+func setConfigReset(t *testing.T, path string, yesFlag bool) {
+	t.Helper()
+	oldCfg, oldYes := cfgFile, yes
+	cfgFile, yes = path, yesFlag
+	t.Cleanup(func() { cfgFile, yes = oldCfg, oldYes })
+}
+
+func TestConfigResetCmd_YesWritesDefaults(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	custom := config.Defaults()
+	custom.Parallelism = 9
+	if err := config.Save(custom, path); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	setConfigReset(t, path, true)
+
+	if err := configResetCmd.RunE(configResetCmd, nil); err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+	got, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("loading reset config: %v", err)
+	}
+	if got.Parallelism != config.Defaults().Parallelism {
+		t.Errorf("expected default parallelism %d, got %d", config.Defaults().Parallelism, got.Parallelism)
+	}
+}
+
+// Without --yes in a non-interactive run, Confirm declines and nothing is written.
+func TestConfigResetCmd_NoConfirmLeavesFileAlone(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	setConfigReset(t, path, false)
+
+	if err := configResetCmd.RunE(configResetCmd, nil); err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("expected no config file written, stat err = %v", err)
+	}
+}
+
+func TestConfigResetCmd_SaveError(t *testing.T) {
+	setConfigReset(t, "/dev/null/impossible/config.yaml", true)
+
+	err := configResetCmd.RunE(configResetCmd, nil)
+	if err == nil || !strings.Contains(err.Error(), "saving default config") {
+		t.Fatalf("expected saving error, got %v", err)
+	}
+}
+
+func TestConfigResetCmd_DefaultPath(t *testing.T) {
+	isolateHome(t)
+	setConfigReset(t, "", true)
+
+	if err := configResetCmd.RunE(configResetCmd, nil); err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+	if _, err := os.Stat(config.DefaultConfigPath()); err != nil {
+		t.Errorf("expected config written to default path under temp HOME: %v", err)
+	}
+}

@@ -55,7 +55,7 @@ var configResetCmd = &cobra.Command{
 	Use:   "reset",
 	Short: "Reset configuration to defaults",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !ui.Confirm("Reset configuration to defaults? This will overwrite your current config.", false) {
+		if !ui.Confirm("Reset configuration to defaults? This will overwrite your current config.", yes) {
 			ui.PrintInfo("Reset cancelled.")
 			return nil
 		}
