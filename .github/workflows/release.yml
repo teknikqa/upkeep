@@ -1,9 +1,22 @@
 name: Release
 
+# Tags that release-please creates with GITHUB_TOKEN don't fire `push`, so
+# release-please.yml calls this workflow directly. workflow_dispatch reruns a tag.
 on:
   push:
     tags:
       - "v*"
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release, e.g. v1.0.1
+        type: string
+        required: true
 
 permissions:
   contents: write
@@ -12,9 +25,12 @@ jobs:
   goreleaser:
     name: Release
     runs-on: macos-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.TAG }}
           fetch-depth: 0
 
       - uses: actions/setup-go@v7
@@ -31,6 +47,6 @@ jobs:
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
 
       - name: Publish MacPorts Portfile
-        run: ./scripts/update-macports-portfile.sh "${GITHUB_REF_NAME#v}"
+        run: ./scripts/update-macports-portfile.sh "${TAG#v}"
         env:
           MACPORTS_TAP_GITHUB_TOKEN: ${{ secrets.MACPORTS_TAP_GITHUB_TOKEN }}
