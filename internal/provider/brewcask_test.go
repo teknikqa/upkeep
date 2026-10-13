@@ -2,6 +2,7 @@ package provider_test
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -182,5 +183,85 @@ func TestBrewCaskProvider_Registered(t *testing.T) {
 	}
 	if p.Name() != "brew-cask" {
 		t.Errorf("expected brew-cask, got %s", p.Name())
+	}
+}
+
+func newTestCaskProvider(cfg config.BrewCaskConfig) *provider.BrewCaskProvider {
+	return provider.NewBrewCaskProvider(cfg, config.NotificationsConfig{}, nil)
+}
+
+func TestBrewCaskScan_NotInstalled(t *testing.T) {
+	isolatedPath(t)
+	if res := newTestCaskProvider(config.BrewCaskConfig{}).Scan(context.Background()); res.Available {
+		t.Errorf("expected unavailable, got %+v", res)
+	}
+}
+
+func TestBrewCaskScan_ReportsCasksWithAuthOverrides(t *testing.T) {
+	bin := isolatedPath(t)
+	fakeCommand(t, bin, "brew", map[string]fakeResponse{
+		"outdated --cask --json=v2 --greedy": {stdout: sampleCaskOutdated},
+	})
+	p := newTestCaskProvider(config.BrewCaskConfig{
+		Greedy:        true,
+		AuthOverrides: map[string]bool{"iterm2": false, "docker": true},
+	})
+
+	res := p.Scan(context.Background())
+	want := []provider.OutdatedItem{
+		{Name: "iterm2", CurrentVersion: "3.4.20", LatestVersion: "3.4.22"},
+		{Name: "docker", CurrentVersion: "20.10.0,20.10.0", LatestVersion: "24.0.0,24.0.0", AuthRequired: true},
+	}
+	if res.Error != nil || !reflect.DeepEqual(res.Outdated, want) {
+		t.Errorf("got %+v (err %v), want %+v", res.Outdated, res.Error, want)
+	}
+}
+
+func TestBrewCaskScan_Errors(t *testing.T) {
+	for name, outdated := range map[string]fakeResponse{
+		"outdated fails": {exit: 1},
+		"bad json":       {stdout: "not json"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			bin := isolatedPath(t)
+			fakeCommand(t, bin, "brew", map[string]fakeResponse{"outdated --cask --json=v2": outdated})
+
+			if res := newTestCaskProvider(config.BrewCaskConfig{}).Scan(context.Background()); res.Error == nil {
+				t.Errorf("expected error, got %+v", res)
+			}
+		})
+	}
+}
+
+func TestBrewCaskDetectAuthRequired(t *testing.T) {
+	inconclusive := fakeResponse{stderr: "Error: network unreachable", exit: 1}
+	info := func(cask string) fakeResponse { return fakeResponse{stdout: `{"casks":[` + cask + `]}`} }
+	tests := []struct {
+		name  string
+		probe fakeResponse
+		info  fakeResponse
+		want  bool
+	}{
+		{"probe succeeds", fakeResponse{}, fakeResponse{}, false},
+		{"probe asks for sudo", fakeResponse{stderr: "sudo: a terminal is required to read the input", exit: 1}, fakeResponse{}, true},
+		{"pkg artifact", inconclusive, info(`{"artifacts":[{"pkg":["App.pkg"]}]}`), true},
+		{"installer artifact string", inconclusive, info(`{"artifacts":["installer"]}`), true},
+		{"plain app", inconclusive, info(`{"artifacts":[{"app":["Example.app"]}]}`), false},
+		{"info fails", inconclusive, fakeResponse{exit: 1}, false},
+		{"info bad json", inconclusive, fakeResponse{stdout: "not json"}, false},
+		{"info no casks", inconclusive, info(""), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bin := isolatedPath(t)
+			fakeCommand(t, bin, "brew", map[string]fakeResponse{
+				"upgrade --cask example --dry-run": tt.probe,
+				"info --cask --json=v2 example":    tt.info,
+			})
+
+			if got := newTestCaskProvider(config.BrewCaskConfig{}).DetectAuthRequired(context.Background(), "example"); got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

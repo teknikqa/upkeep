@@ -2,6 +2,7 @@ package provider_test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/teknikqa/upkeep/internal/config"
@@ -175,4 +176,31 @@ func TestComposerProvider_Update_ItemsAccountedFor(t *testing.T) {
 	if total != 2 {
 		t.Errorf("expected 2 items accounted for, got updated=%v failed=%v", result.Updated, result.Failed)
 	}
+}
+
+func TestComposerScan(t *testing.T) {
+	t.Run("not installed", func(t *testing.T) {
+		isolatedPath(t)
+		if res := provider.NewComposerProvider(config.ComposerConfig{}, nil).Scan(context.Background()); res.Available {
+			t.Errorf("expected unavailable, got %+v", res)
+		}
+	})
+	t.Run("pending updates", func(t *testing.T) {
+		bin := isolatedPath(t)
+		fakeCommand(t, bin, "composer", map[string]fakeResponse{
+			"global update --dry-run": {stdout: sampleComposerDryRunUpdates},
+		})
+		res := provider.NewComposerProvider(config.ComposerConfig{}, nil).Scan(context.Background())
+		want := []string{"phpunit/phpunit", "squizlabs/php_codesniffer"}
+		if res.Error != nil || !reflect.DeepEqual(itemNames(res.Outdated), want) {
+			t.Errorf("got %+v, want %v", res, want)
+		}
+	})
+	t.Run("dry run fails", func(t *testing.T) {
+		bin := isolatedPath(t)
+		fakeCommand(t, bin, "composer", map[string]fakeResponse{"global update --dry-run": {exit: 1}})
+		if res := provider.NewComposerProvider(config.ComposerConfig{}, nil).Scan(context.Background()); res.Error == nil {
+			t.Errorf("expected error, got %+v", res)
+		}
+	})
 }
