@@ -148,11 +148,15 @@ func TestCopyConfig_DeepCopy(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Providers.Brew.Skip = []string{"formula1", "formula2"}
 	cfg.Providers.BrewCask.AuthOverrides = map[string]bool{"app1": true}
+	cfg.Providers.Mas.Skip = []string{"Xcode"}
+	cfg.Providers.Macports.Skip = []string{"python312"}
 
 	cp := copyConfig(cfg)
 
 	// Mutate the copy.
 	cp.Providers.Brew.Skip[0] = "MODIFIED"
+	cp.Providers.Mas.Skip[0] = "MODIFIED"
+	cp.Providers.Macports.Skip[0] = "MODIFIED"
 	cp.Providers.BrewCask.AuthOverrides["app1"] = false
 
 	// Original must be unchanged.
@@ -161,6 +165,12 @@ func TestCopyConfig_DeepCopy(t *testing.T) {
 	}
 	if !cfg.Providers.BrewCask.AuthOverrides["app1"] {
 		t.Errorf("BrewCask.AuthOverrides[\"app1\"] was mutated")
+	}
+	if cfg.Providers.Mas.Skip[0] != "Xcode" {
+		t.Errorf("Mas.Skip[0] was mutated: %q", cfg.Providers.Mas.Skip[0])
+	}
+	if cfg.Providers.Macports.Skip[0] != "python312" {
+		t.Errorf("Macports.Skip[0] was mutated: %q", cfg.Providers.Macports.Skip[0])
 	}
 }
 

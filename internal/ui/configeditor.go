@@ -168,18 +168,25 @@ func editLoggingSection(cfg *config.Config) error {
 
 // editProvidersSection shows the provider list and dispatches to per-provider editors.
 func editProvidersSection(cfg *config.Config) error {
+	p := &cfg.Providers
 	for {
 		options := []string{
-			formatMenuLabel("Brew", cfg.Providers.Brew.Enabled),
-			formatMenuLabel("Brew Cask", cfg.Providers.BrewCask.Enabled),
-			formatMenuLabel("npm", cfg.Providers.Npm.Enabled),
-			formatMenuLabel("Composer", cfg.Providers.Composer.Enabled),
-			formatMenuLabel("pip", cfg.Providers.Pip.Enabled),
-			formatMenuLabel("Rust", cfg.Providers.Rust.Enabled),
-			formatMenuLabel("VS Code", cfg.Providers.Editor.Enabled),
-			formatMenuLabel("Oh My Zsh", cfg.Providers.Omz.Enabled),
-			formatMenuLabel("Vim", cfg.Providers.Vim.Enabled),
-			formatMenuLabel("Vagrant", cfg.Providers.Vagrant.Enabled),
+			formatMenuLabel("Brew", p.Brew.Enabled),
+			formatMenuLabel("Brew Cask", p.BrewCask.Enabled),
+			formatMenuLabel("npm", p.Npm.Enabled),
+			formatMenuLabel("pnpm", p.Pnpm.Enabled),
+			formatMenuLabel("Yarn", p.Yarn.Enabled),
+			formatMenuLabel("Bun", p.Bun.Enabled),
+			formatMenuLabel("Composer", p.Composer.Enabled),
+			formatMenuLabel("pip", p.Pip.Enabled),
+			formatMenuLabel("Rust", p.Rust.Enabled),
+			formatMenuLabel("uv", p.Uv.Enabled),
+			formatMenuLabel("Editor Extensions", p.Editor.Enabled),
+			formatMenuLabel("Oh My Zsh", p.Omz.Enabled),
+			formatMenuLabel("Vim", p.Vim.Enabled),
+			formatMenuLabel("Vagrant", p.Vagrant.Enabled),
+			formatMenuLabel("Mac App Store", p.Mas.Enabled),
+			formatMenuLabel("MacPorts", p.Macports.Enabled),
 			"Back",
 		}
 
@@ -191,54 +198,146 @@ func editProvidersSection(cfg *config.Config) error {
 			return fmt.Errorf("providers menu: %w", err)
 		}
 
+		var editErr error
 		switch {
 		case choice == "Back":
 			return nil
 		case startsWith(choice, "Brew Cask"):
-			if err := editBrewCaskProvider(cfg); err != nil {
-				return err
-			}
+			editErr = editBrewCaskProvider(cfg)
 		case startsWith(choice, "Brew"):
-			if err := editBrewProvider(cfg); err != nil {
-				return err
-			}
+			editErr = editBrewProvider(cfg)
 		case startsWith(choice, "npm"):
-			if err := editNpmProvider(cfg); err != nil {
-				return err
-			}
+			editErr = editEnabledSkipProvider("npm", "Skip packages", &p.Npm.Enabled, &p.Npm.Skip)
+		case startsWith(choice, "pnpm"):
+			editErr = editEnabledOnlyProvider("pnpm", &p.Pnpm.Enabled)
+		case startsWith(choice, "Yarn"):
+			editErr = editEnabledOnlyProvider("Yarn", &p.Yarn.Enabled)
+		case startsWith(choice, "Bun"):
+			editErr = editEnabledOnlyProvider("Bun", &p.Bun.Enabled)
 		case startsWith(choice, "Composer"):
-			if err := editComposerProvider(cfg); err != nil {
-				return err
-			}
+			editErr = editEnabledOnlyProvider("Composer", &p.Composer.Enabled)
 		case startsWith(choice, "pip"):
-			if err := editPipProvider(cfg); err != nil {
-				return err
-			}
+			editErr = editPipProvider(cfg)
 		case startsWith(choice, "Rust"):
-			if err := editRustProvider(cfg); err != nil {
-				return err
-			}
-		case startsWith(choice, "VS Code"):
-			if err := editEditorProvider(cfg); err != nil {
-				return err
-			}
+			editErr = editRustProvider(cfg)
+		case startsWith(choice, "uv"):
+			editErr = editUvProvider(cfg)
+		case startsWith(choice, "Editor Extensions"):
+			editErr = editEditorProvider(cfg)
 		case startsWith(choice, "Oh My Zsh"):
-			if err := editOmzProvider(cfg); err != nil {
-				return err
-			}
+			editErr = editEnabledOnlyProvider("Oh My Zsh", &p.Omz.Enabled)
 		case startsWith(choice, "Vim"):
-			if err := editVimProvider(cfg); err != nil {
-				return err
-			}
+			editErr = editVimProvider(cfg)
 		case startsWith(choice, "Vagrant"):
-			if err := editVagrantProvider(cfg); err != nil {
-				return err
-			}
+			editErr = editVagrantProvider(cfg)
+		case startsWith(choice, "Mac App Store"):
+			editErr = editEnabledSkipProvider("Mac App Store", "Skip apps", &p.Mas.Enabled, &p.Mas.Skip)
+		case startsWith(choice, "MacPorts"):
+			editErr = editEnabledSkipProvider("MacPorts", "Skip ports", &p.Macports.Enabled, &p.Macports.Skip)
+		}
+		if editErr != nil {
+			return editErr
 		}
 	}
 }
 
 // --- Per-provider editors ---
+
+// editEnabledOnlyProvider edits a provider whose only setting is Enabled.
+func editEnabledOnlyProvider(name string, enabled *bool) error {
+	for {
+		choice, err := pterm.DefaultInteractiveSelect.
+			WithDefaultText(name + " Settings").
+			WithOptions([]string{
+				formatMenuLabel("Enabled", *enabled),
+				"Back",
+			}).
+			Show()
+		if err != nil {
+			return err
+		}
+		if choice == "Back" {
+			return nil
+		}
+		v, err := editBool("Enable "+name, *enabled)
+		if err != nil {
+			return err
+		}
+		*enabled = v
+	}
+}
+
+// editEnabledSkipProvider edits a provider with Enabled and Skip settings.
+func editEnabledSkipProvider(name, skipPrompt string, enabled *bool, skip *[]string) error {
+	for {
+		choice, err := pterm.DefaultInteractiveSelect.
+			WithDefaultText(name + " Settings").
+			WithOptions([]string{
+				formatMenuLabel("Enabled", *enabled),
+				formatMenuLabel("Skip", *skip),
+				"Back",
+			}).
+			Show()
+		if err != nil {
+			return err
+		}
+		switch {
+		case choice == "Back":
+			return nil
+		case startsWith(choice, "Enabled"):
+			v, err := editBool("Enable "+name, *enabled)
+			if err != nil {
+				return err
+			}
+			*enabled = v
+		case startsWith(choice, "Skip"):
+			v, err := editStringSlice(skipPrompt, *skip)
+			if err != nil {
+				return err
+			}
+			*skip = v
+		}
+	}
+}
+
+func editUvProvider(cfg *config.Config) error {
+	for {
+		choice, err := pterm.DefaultInteractiveSelect.
+			WithDefaultText("uv Settings").
+			WithOptions([]string{
+				formatMenuLabel("Enabled", cfg.Providers.Uv.Enabled),
+				formatMenuLabel("Self Update", cfg.Providers.Uv.SelfUpdate),
+				formatMenuLabel("Tools", cfg.Providers.Uv.Tool),
+				"Back",
+			}).
+			Show()
+		if err != nil {
+			return err
+		}
+		switch {
+		case choice == "Back":
+			return nil
+		case startsWith(choice, "Enabled"):
+			v, err := editBool("Enable uv", cfg.Providers.Uv.Enabled)
+			if err != nil {
+				return err
+			}
+			cfg.Providers.Uv.Enabled = v
+		case startsWith(choice, "Self Update"):
+			v, err := editBool("Run uv self update", cfg.Providers.Uv.SelfUpdate)
+			if err != nil {
+				return err
+			}
+			cfg.Providers.Uv.SelfUpdate = v
+		case startsWith(choice, "Tools"):
+			v, err := editBool("Upgrade uv tool packages", cfg.Providers.Uv.Tool)
+			if err != nil {
+				return err
+			}
+			cfg.Providers.Uv.Tool = v
+		}
+	}
+}
 
 func editBrewProvider(cfg *config.Config) error {
 	for {
@@ -339,63 +438,6 @@ func editBrewCaskProvider(cfg *config.Config) error {
 	}
 }
 
-func editNpmProvider(cfg *config.Config) error {
-	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("npm Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", cfg.Providers.Npm.Enabled),
-				formatMenuLabel("Skip", cfg.Providers.Npm.Skip),
-				"Back",
-			}).
-			Show()
-		if err != nil {
-			return err
-		}
-		switch {
-		case choice == "Back":
-			return nil
-		case startsWith(choice, "Enabled"):
-			v, err := editBool("Enable npm", cfg.Providers.Npm.Enabled)
-			if err != nil {
-				return err
-			}
-			cfg.Providers.Npm.Enabled = v
-		case startsWith(choice, "Skip"):
-			v, err := editStringSlice("Skip packages", cfg.Providers.Npm.Skip)
-			if err != nil {
-				return err
-			}
-			cfg.Providers.Npm.Skip = v
-		}
-	}
-}
-
-func editComposerProvider(cfg *config.Config) error {
-	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("Composer Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", cfg.Providers.Composer.Enabled),
-				"Back",
-			}).
-			Show()
-		if err != nil {
-			return err
-		}
-		switch {
-		case choice == "Back":
-			return nil
-		case startsWith(choice, "Enabled"):
-			v, err := editBool("Enable Composer", cfg.Providers.Composer.Enabled)
-			if err != nil {
-				return err
-			}
-			cfg.Providers.Composer.Enabled = v
-		}
-	}
-}
-
 func editPipProvider(cfg *config.Config) error {
 	for {
 		choice, err := pterm.DefaultInteractiveSelect.
@@ -484,7 +526,7 @@ func editRustProvider(cfg *config.Config) error {
 func editEditorProvider(cfg *config.Config) error {
 	for {
 		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("VS Code Settings").
+			WithDefaultText("Editor Extensions Settings").
 			WithOptions([]string{
 				formatMenuLabel("Enabled", cfg.Providers.Editor.Enabled),
 				formatMenuLabel("Editors", cfg.Providers.Editor.Editors),
@@ -499,7 +541,7 @@ func editEditorProvider(cfg *config.Config) error {
 		case choice == "Back":
 			return nil
 		case startsWith(choice, "Enabled"):
-			v, err := editBool("Enable VS Code", cfg.Providers.Editor.Enabled)
+			v, err := editBool("Enable editor extensions", cfg.Providers.Editor.Enabled)
 			if err != nil {
 				return err
 			}
@@ -516,31 +558,6 @@ func editEditorProvider(cfg *config.Config) error {
 				return err
 			}
 			cfg.Providers.Editor.Timeout = v
-		}
-	}
-}
-
-func editOmzProvider(cfg *config.Config) error {
-	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("Oh My Zsh Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", cfg.Providers.Omz.Enabled),
-				"Back",
-			}).
-			Show()
-		if err != nil {
-			return err
-		}
-		switch {
-		case choice == "Back":
-			return nil
-		case startsWith(choice, "Enabled"):
-			v, err := editBool("Enable Oh My Zsh", cfg.Providers.Omz.Enabled)
-			if err != nil {
-				return err
-			}
-			cfg.Providers.Omz.Enabled = v
 		}
 	}
 }
@@ -633,6 +650,8 @@ func copyConfig(cfg *config.Config) *config.Config {
 	c.Providers.BrewCask.Skip = copyStringSlice(cfg.Providers.BrewCask.Skip)
 	c.Providers.BrewCask.AuthOverrides = copyStringBoolMap(cfg.Providers.BrewCask.AuthOverrides)
 	c.Providers.Npm.Skip = copyStringSlice(cfg.Providers.Npm.Skip)
+	c.Providers.Mas.Skip = copyStringSlice(cfg.Providers.Mas.Skip)
+	c.Providers.Macports.Skip = copyStringSlice(cfg.Providers.Macports.Skip)
 	c.Providers.Editor.Editors = copyStringSlice(cfg.Providers.Editor.Editors)
 	return &c
 }
