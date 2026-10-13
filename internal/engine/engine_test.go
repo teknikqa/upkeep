@@ -2,6 +2,7 @@ package engine_test
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -770,5 +771,28 @@ func TestExecute_ParallelExecution(t *testing.T) {
 		if len(r.Updated) != 1 || r.Updated[0] != name {
 			t.Errorf("%s: unexpected Updated: %v", name, r.Updated)
 		}
+	}
+}
+
+func TestEngine_CancelledDuringScanSkipsUpdate(t *testing.T) {
+	cfg, st, logger := engineTestFixtures(t)
+	eng := engine.New(cfg, st, logger)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	ran := make(map[string]bool)
+	err := eng.Run(ctx, engine.Options{
+		Providers: []provider.Provider{&trackingProvider{Provider: &mockProvider{
+			name:       "brew",
+			scanResult: provider.ScanResult{Available: true, Outdated: []provider.OutdatedItem{{Name: "git"}}},
+		}, ran: ran}},
+		Yes:    true,
+		Output: &strings.Builder{},
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+	if ran["brew"] {
+		t.Error("update should not run after the scan was cancelled")
 	}
 }
