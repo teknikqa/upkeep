@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2](https://github.com/teknikqa/upkeep/compare/v1.0.1...v1.0.2) (2026-10-13)
+
+
+### Fixed
+
+* create releases as drafts so binaries attach before they become immutable ([#61](https://github.com/teknikqa/upkeep/issues/61)) ([2d509b1](https://github.com/teknikqa/upkeep/commit/2d509b10ebbcd8433b87195ec1e792c4aba006a3))
+
 ## [1.0.1](https://github.com/teknikqa/upkeep/compare/v1.0.0...v1.0.1) (2026-10-13)
 
 
