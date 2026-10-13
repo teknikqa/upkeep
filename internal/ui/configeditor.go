@@ -22,17 +22,14 @@ func RunConfigEditor(cfg *config.Config) (*config.Config, bool, error) {
 	fmt.Println()
 
 	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("Select a section to edit").
-			WithOptions([]string{
-				"General",
-				"Providers",
-				"Notifications",
-				"Logging",
-				"Save & Exit",
-				"Exit without saving",
-			}).
-			Show()
+		choice, err := selectOption("Select a section to edit", []string{
+			"General",
+			"Providers",
+			"Notifications",
+			"Logging",
+			"Save & Exit",
+			"Exit without saving",
+		})
 		if err != nil {
 			return nil, false, fmt.Errorf("menu selection: %w", err)
 		}
@@ -75,13 +72,10 @@ func RunConfigEditor(cfg *config.Config) (*config.Config, bool, error) {
 // editGeneralSection edits top-level config fields.
 func editGeneralSection(cfg *config.Config) error {
 	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("General Settings").
-			WithOptions([]string{
-				formatMenuLabel("Parallelism", cfg.Parallelism),
-				"Back",
-			}).
-			Show()
+		choice, err := selectOption("General Settings", []string{
+			formatMenuLabel("Parallelism", cfg.Parallelism),
+			"Back",
+		})
 		if err != nil {
 			return fmt.Errorf("general menu: %w", err)
 		}
@@ -101,14 +95,11 @@ func editGeneralSection(cfg *config.Config) error {
 // editNotificationsSection edits notification settings.
 func editNotificationsSection(cfg *config.Config) error {
 	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("Notification Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", cfg.Notifications.Enabled),
-				formatMenuLabel("Tool", cfg.Notifications.Tool),
-				"Back",
-			}).
-			Show()
+		choice, err := selectOption("Notification Settings", []string{
+			formatMenuLabel("Enabled", cfg.Notifications.Enabled),
+			formatMenuLabel("Tool", cfg.Notifications.Tool),
+			"Back",
+		})
 		if err != nil {
 			return fmt.Errorf("notifications menu: %w", err)
 		}
@@ -135,14 +126,11 @@ func editNotificationsSection(cfg *config.Config) error {
 // editLoggingSection edits logging settings.
 func editLoggingSection(cfg *config.Config) error {
 	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("Logging Settings").
-			WithOptions([]string{
-				formatMenuLabel("Dir", cfg.Logging.Dir),
-				formatMenuLabel("Level", cfg.Logging.Level),
-				"Back",
-			}).
-			Show()
+		choice, err := selectOption("Logging Settings", []string{
+			formatMenuLabel("Dir", cfg.Logging.Dir),
+			formatMenuLabel("Level", cfg.Logging.Level),
+			"Back",
+		})
 		if err != nil {
 			return fmt.Errorf("logging menu: %w", err)
 		}
@@ -190,10 +178,7 @@ func editProvidersSection(cfg *config.Config) error {
 			"Back",
 		}
 
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("Select a provider to configure").
-			WithOptions(options).
-			Show()
+		choice, err := selectOption("Select a provider to configure", options)
 		if err != nil {
 			return fmt.Errorf("providers menu: %w", err)
 		}
@@ -246,13 +231,10 @@ func editProvidersSection(cfg *config.Config) error {
 // editEnabledOnlyProvider edits a provider whose only setting is Enabled.
 func editEnabledOnlyProvider(name string, enabled *bool) error {
 	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText(name + " Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", *enabled),
-				"Back",
-			}).
-			Show()
+		choice, err := selectOption(name+" Settings", []string{
+			formatMenuLabel("Enabled", *enabled),
+			"Back",
+		})
 		if err != nil {
 			return err
 		}
@@ -270,14 +252,11 @@ func editEnabledOnlyProvider(name string, enabled *bool) error {
 // editEnabledSkipProvider edits a provider with Enabled and Skip settings.
 func editEnabledSkipProvider(name, skipPrompt string, enabled *bool, skip *[]string) error {
 	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText(name + " Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", *enabled),
-				formatMenuLabel("Skip", *skip),
-				"Back",
-			}).
-			Show()
+		choice, err := selectOption(name+" Settings", []string{
+			formatMenuLabel("Enabled", *enabled),
+			formatMenuLabel("Skip", *skip),
+			"Back",
+		})
 		if err != nil {
 			return err
 		}
@@ -302,15 +281,12 @@ func editEnabledSkipProvider(name, skipPrompt string, enabled *bool, skip *[]str
 
 func editUvProvider(cfg *config.Config) error {
 	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("uv Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", cfg.Providers.Uv.Enabled),
-				formatMenuLabel("Self Update", cfg.Providers.Uv.SelfUpdate),
-				formatMenuLabel("Tools", cfg.Providers.Uv.Tool),
-				"Back",
-			}).
-			Show()
+		choice, err := selectOption("uv Settings", []string{
+			formatMenuLabel("Enabled", cfg.Providers.Uv.Enabled),
+			formatMenuLabel("Self Update", cfg.Providers.Uv.SelfUpdate),
+			formatMenuLabel("Tools", cfg.Providers.Uv.Tool),
+			"Back",
+		})
 		if err != nil {
 			return err
 		}
@@ -341,15 +317,12 @@ func editUvProvider(cfg *config.Config) error {
 
 func editBrewProvider(cfg *config.Config) error {
 	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("Brew Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", cfg.Providers.Brew.Enabled),
-				formatMenuLabel("Skip", cfg.Providers.Brew.Skip),
-				formatMenuLabel("Post Hooks", cfg.Providers.Brew.PostHooks),
-				"Back",
-			}).
-			Show()
+		choice, err := selectOption("Brew Settings", []string{
+			formatMenuLabel("Enabled", cfg.Providers.Brew.Enabled),
+			formatMenuLabel("Skip", cfg.Providers.Brew.Skip),
+			formatMenuLabel("Post Hooks", cfg.Providers.Brew.PostHooks),
+			"Back",
+		})
 		if err != nil {
 			return err
 		}
@@ -380,18 +353,15 @@ func editBrewProvider(cfg *config.Config) error {
 
 func editBrewCaskProvider(cfg *config.Config) error {
 	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("Brew Cask Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", cfg.Providers.BrewCask.Enabled),
-				formatMenuLabel("Greedy", cfg.Providers.BrewCask.Greedy),
-				formatMenuLabel("Skip", cfg.Providers.BrewCask.Skip),
-				formatMenuLabel("Auth Strategy", cfg.Providers.BrewCask.AuthStrategy),
-				formatMenuLabel("Auth Overrides", cfg.Providers.BrewCask.AuthOverrides),
-				formatMenuLabel("Rebuild Open With", cfg.Providers.BrewCask.RebuildOpenWith),
-				"Back",
-			}).
-			Show()
+		choice, err := selectOption("Brew Cask Settings", []string{
+			formatMenuLabel("Enabled", cfg.Providers.BrewCask.Enabled),
+			formatMenuLabel("Greedy", cfg.Providers.BrewCask.Greedy),
+			formatMenuLabel("Skip", cfg.Providers.BrewCask.Skip),
+			formatMenuLabel("Auth Strategy", cfg.Providers.BrewCask.AuthStrategy),
+			formatMenuLabel("Auth Overrides", cfg.Providers.BrewCask.AuthOverrides),
+			formatMenuLabel("Rebuild Open With", cfg.Providers.BrewCask.RebuildOpenWith),
+			"Back",
+		})
 		if err != nil {
 			return err
 		}
@@ -440,16 +410,13 @@ func editBrewCaskProvider(cfg *config.Config) error {
 
 func editPipProvider(cfg *config.Config) error {
 	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("pip Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", cfg.Providers.Pip.Enabled),
-				formatMenuLabel("Upgrade pip", cfg.Providers.Pip.UpgradePip),
-				formatMenuLabel("Upgrade setuptools", cfg.Providers.Pip.UpgradeSetuptools),
-				formatMenuLabel("pipx", cfg.Providers.Pip.Pipx),
-				"Back",
-			}).
-			Show()
+		choice, err := selectOption("pip Settings", []string{
+			formatMenuLabel("Enabled", cfg.Providers.Pip.Enabled),
+			formatMenuLabel("Upgrade pip", cfg.Providers.Pip.UpgradePip),
+			formatMenuLabel("Upgrade setuptools", cfg.Providers.Pip.UpgradeSetuptools),
+			formatMenuLabel("pipx", cfg.Providers.Pip.Pipx),
+			"Back",
+		})
 		if err != nil {
 			return err
 		}
@@ -486,15 +453,12 @@ func editPipProvider(cfg *config.Config) error {
 
 func editRustProvider(cfg *config.Config) error {
 	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("Rust Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", cfg.Providers.Rust.Enabled),
-				formatMenuLabel("Rustup", cfg.Providers.Rust.Rustup),
-				formatMenuLabel("Cargo install-update", cfg.Providers.Rust.CargoInstallUpdate),
-				"Back",
-			}).
-			Show()
+		choice, err := selectOption("Rust Settings", []string{
+			formatMenuLabel("Enabled", cfg.Providers.Rust.Enabled),
+			formatMenuLabel("Rustup", cfg.Providers.Rust.Rustup),
+			formatMenuLabel("Cargo install-update", cfg.Providers.Rust.CargoInstallUpdate),
+			"Back",
+		})
 		if err != nil {
 			return err
 		}
@@ -525,15 +489,12 @@ func editRustProvider(cfg *config.Config) error {
 
 func editEditorProvider(cfg *config.Config) error {
 	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("Editor Extensions Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", cfg.Providers.Editor.Enabled),
-				formatMenuLabel("Editors", cfg.Providers.Editor.Editors),
-				formatMenuLabel("Timeout", cfg.Providers.Editor.Timeout),
-				"Back",
-			}).
-			Show()
+		choice, err := selectOption("Editor Extensions Settings", []string{
+			formatMenuLabel("Enabled", cfg.Providers.Editor.Enabled),
+			formatMenuLabel("Editors", cfg.Providers.Editor.Editors),
+			formatMenuLabel("Timeout", cfg.Providers.Editor.Timeout),
+			"Back",
+		})
 		if err != nil {
 			return err
 		}
@@ -564,16 +525,13 @@ func editEditorProvider(cfg *config.Config) error {
 
 func editVimProvider(cfg *config.Config) error {
 	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("Vim Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", cfg.Providers.Vim.Enabled),
-				formatMenuLabel("Update Script", cfg.Providers.Vim.UpdateScript),
-				formatMenuLabel("Pathogen Dir", cfg.Providers.Vim.PathogenDir),
-				formatMenuLabel("Bundles Dir", cfg.Providers.Vim.BundlesDir),
-				"Back",
-			}).
-			Show()
+		choice, err := selectOption("Vim Settings", []string{
+			formatMenuLabel("Enabled", cfg.Providers.Vim.Enabled),
+			formatMenuLabel("Update Script", cfg.Providers.Vim.UpdateScript),
+			formatMenuLabel("Pathogen Dir", cfg.Providers.Vim.PathogenDir),
+			formatMenuLabel("Bundles Dir", cfg.Providers.Vim.BundlesDir),
+			"Back",
+		})
 		if err != nil {
 			return err
 		}
@@ -610,14 +568,11 @@ func editVimProvider(cfg *config.Config) error {
 
 func editVagrantProvider(cfg *config.Config) error {
 	for {
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText("Vagrant Settings").
-			WithOptions([]string{
-				formatMenuLabel("Enabled", cfg.Providers.Vagrant.Enabled),
-				formatMenuLabel("Notify", cfg.Providers.Vagrant.Notify),
-				"Back",
-			}).
-			Show()
+		choice, err := selectOption("Vagrant Settings", []string{
+			formatMenuLabel("Enabled", cfg.Providers.Vagrant.Enabled),
+			formatMenuLabel("Notify", cfg.Providers.Vagrant.Notify),
+			"Back",
+		})
 		if err != nil {
 			return err
 		}

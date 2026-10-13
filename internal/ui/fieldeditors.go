@@ -8,12 +8,19 @@ import (
 	"github.com/pterm/pterm"
 )
 
+// Interactive prompts, swappable so tests can drive the menus without a TTY.
+var (
+	selectOption = func(label string, options []string) (string, error) {
+		return pterm.DefaultInteractiveSelect.WithDefaultText(label).WithOptions(options).Show()
+	}
+	confirmBool = func(label string, current bool) (bool, error) {
+		return pterm.DefaultInteractiveConfirm.WithDefaultText(label).WithDefaultValue(current).Show()
+	}
+)
+
 // editBool prompts the user to toggle a boolean value.
 func editBool(label string, current bool) (bool, error) {
-	result, err := pterm.DefaultInteractiveConfirm.
-		WithDefaultText(label).
-		WithDefaultValue(current).
-		Show()
+	result, err := confirmBool(label, current)
 	if err != nil {
 		return current, fmt.Errorf("editing %s: %w", label, err)
 	}
@@ -79,10 +86,7 @@ func editStringSlice(label string, current []string) ([]string, error) {
 		header := fmt.Sprintf("%s: %s", label, formatSlice(items))
 		options := []string{"Add item", "Remove item", "Back"}
 
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText(header).
-			WithOptions(options).
-			Show()
+		choice, err := selectOption(header, options)
 		if err != nil {
 			return items, fmt.Errorf("editing %s: %w", label, err)
 		}
@@ -107,10 +111,7 @@ func editStringSlice(label string, current []string) ([]string, error) {
 			}
 			removeOpts := append([]string{}, items...)
 			removeOpts = append(removeOpts, "Cancel")
-			toRemove, err := pterm.DefaultInteractiveSelect.
-				WithDefaultText("Select item to remove").
-				WithOptions(removeOpts).
-				Show()
+			toRemove, err := selectOption("Select item to remove", removeOpts)
 			if err != nil || toRemove == "Cancel" {
 				continue
 			}
@@ -134,10 +135,7 @@ func editMapStringBool(label string, current map[string]bool) (map[string]bool, 
 		header := fmt.Sprintf("%s: %s", label, formatMap(m))
 		options := []string{"Add entry", "Toggle entry", "Remove entry", "Back"}
 
-		choice, err := pterm.DefaultInteractiveSelect.
-			WithDefaultText(header).
-			WithOptions(options).
-			Show()
+		choice, err := selectOption(header, options)
 		if err != nil {
 			return m, fmt.Errorf("editing %s: %w", label, err)
 		}
@@ -172,10 +170,7 @@ func editMapStringBool(label string, current map[string]bool) (map[string]bool, 
 			togOpts := make([]string, len(keys)+1)
 			copy(togOpts, keys)
 			togOpts[len(keys)] = "Cancel"
-			toToggle, err := pterm.DefaultInteractiveSelect.
-				WithDefaultText("Select entry to toggle").
-				WithOptions(togOpts).
-				Show()
+			toToggle, err := selectOption("Select entry to toggle", togOpts)
 			if err != nil || toToggle == "Cancel" {
 				continue
 			}
@@ -190,10 +185,7 @@ func editMapStringBool(label string, current map[string]bool) (map[string]bool, 
 			remOpts := make([]string, len(keys)+1)
 			copy(remOpts, keys)
 			remOpts[len(keys)] = "Cancel"
-			toRemove, err := pterm.DefaultInteractiveSelect.
-				WithDefaultText("Select entry to remove").
-				WithOptions(remOpts).
-				Show()
+			toRemove, err := selectOption("Select entry to remove", remOpts)
 			if err != nil || toRemove == "Cancel" {
 				continue
 			}
