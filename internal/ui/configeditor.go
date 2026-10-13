@@ -11,7 +11,7 @@ import (
 // RunConfigEditor launches the interactive TUI config editor.
 // Returns the edited config and whether the user chose to save.
 func RunConfigEditor(cfg *config.Config) (*config.Config, bool, error) {
-	if !IsTTY() {
+	if !isInteractive() {
 		return nil, false, fmt.Errorf("interactive config editor requires a terminal (TTY)")
 	}
 

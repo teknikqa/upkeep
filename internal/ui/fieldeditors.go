@@ -8,16 +8,6 @@ import (
 	"github.com/pterm/pterm"
 )
 
-// Interactive prompts, swappable so tests can drive the menus without a TTY.
-var (
-	selectOption = func(label string, options []string) (string, error) {
-		return pterm.DefaultInteractiveSelect.WithDefaultText(label).WithOptions(options).Show()
-	}
-	confirmBool = func(label string, current bool) (bool, error) {
-		return pterm.DefaultInteractiveConfirm.WithDefaultText(label).WithDefaultValue(current).Show()
-	}
-)
-
 // editBool prompts the user to toggle a boolean value.
 func editBool(label string, current bool) (bool, error) {
 	result, err := confirmBool(label, current)

@@ -214,9 +214,10 @@ func TestStatusEmoji_Unknown(t *testing.T) {
 // matched as a prefix of the offered options; confirms are returned in order.
 func scriptPrompts(t *testing.T, selects []string, confirms ...bool) {
 	t.Helper()
-	origSelect, origConfirm := selectOption, confirmBool
+	origSelect, origConfirm, origInteractive := selectOption, confirmBool, isInteractive
+	isInteractive = func() bool { return true }
 	t.Cleanup(func() {
-		selectOption, confirmBool = origSelect, origConfirm
+		selectOption, confirmBool, isInteractive = origSelect, origConfirm, origInteractive
 		if len(selects) > 0 || len(confirms) > 0 {
 			t.Errorf("unused script: selects=%v confirms=%v", selects, confirms)
 		}
@@ -242,6 +243,57 @@ func scriptPrompts(t *testing.T, selects []string, confirms ...bool) {
 		v := confirms[0]
 		confirms = confirms[1:]
 		return v, nil
+	}
+}
+
+func TestRunConfigEditor_RequiresTTY(t *testing.T) {
+	scriptPrompts(t, nil)
+	isInteractive = func() bool { return false }
+
+	if _, _, err := RunConfigEditor(config.Defaults()); err == nil {
+		t.Fatal("expected error without a TTY")
+	}
+}
+
+func TestRunConfigEditor_SaveAfterVisitingSections(t *testing.T) {
+	scriptPrompts(t, []string{
+		"General", "Back",
+		"Providers", "pnpm", "Enabled", "Back", "Back",
+		"Notifications", "Back",
+		"Logging", "Back",
+		"Save & Exit",
+	}, false)
+	orig := config.Defaults()
+
+	edited, save, err := RunConfigEditor(orig)
+	if err != nil || !save {
+		t.Fatalf("save=%v err=%v", save, err)
+	}
+	if edited.Providers.Pnpm.Enabled {
+		t.Error("edit was not applied")
+	}
+	if !orig.Providers.Pnpm.Enabled {
+		t.Error("original config was mutated")
+	}
+}
+
+func TestRunConfigEditor_InvalidConfigBlocksSave(t *testing.T) {
+	scriptPrompts(t, []string{"Save & Exit", "Exit without saving"})
+	cfg := config.Defaults()
+	cfg.Parallelism = 0
+
+	edited, save, err := RunConfigEditor(cfg)
+	if err != nil || save || edited != nil {
+		t.Fatalf("edited=%v save=%v err=%v", edited, save, err)
+	}
+}
+
+func TestRunConfigEditor_PropagatesSelectError(t *testing.T) {
+	scriptPrompts(t, nil)
+	selectOption = func(string, []string) (string, error) { return "", errors.New("boom") }
+
+	if _, _, err := RunConfigEditor(config.Defaults()); err == nil {
+		t.Fatal("expected error")
 	}
 }
 
