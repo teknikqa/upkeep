@@ -1,12 +1,36 @@
 package config_test
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/teknikqa/upkeep/internal/config"
 )
+
+// The example config documents every setting, so it must decode strictly
+// and match the built-in defaults.
+func TestExampleConfigMatchesDefaults(t *testing.T) {
+	data, err := os.ReadFile("../../example-config.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got config.Config
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(&got); err != nil {
+		t.Fatalf("example-config.yaml: %v", err)
+	}
+	// Compare marshaled forms so nil and empty slices count as equal.
+	gotYAML, _ := yaml.Marshal(&got)
+	wantYAML, _ := yaml.Marshal(config.Defaults())
+	if !bytes.Equal(gotYAML, wantYAML) {
+		t.Errorf("example-config.yaml differs from Defaults():\n got:\n%s\nwant:\n%s", gotYAML, wantYAML)
+	}
+}
 
 func TestLoad_MissingFileReturnsDefaults(t *testing.T) {
 	cfg, err := config.Load("/nonexistent/path/config.yaml")

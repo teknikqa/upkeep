@@ -31,6 +31,15 @@ providers:
     enabled: true
     skip: []
 
+  pnpm:
+    enabled: true
+
+  yarn:
+    enabled: true           # Yarn Classic (1.x) only; skipped on Berry
+
+  bun:
+    enabled: true
+
   composer:
     enabled: true
 
@@ -45,17 +54,22 @@ providers:
     rustup: true            # run rustup update
     cargo_install_update: true # run cargo install-update -a
 
+  uv:
+    enabled: true
+    self_update: true       # run uv self update (standalone installs only)
+    tool: true              # run uv tool upgrade --all
+
   editor:
     enabled: true
     editors:                # CLI names of editors to update extensions for
       - code
       - cursor
       - kiro
-      - windsurf
+      - devin-desktop
       - agy
     timeout: 300            # seconds per editor before timeout
     # marketplace:          # optional: override marketplace per editor
-    #   windsurf: openvsx   # "vsmarketplace" (default) | "openvsx"
+    #   devin-desktop: openvsx   # "vsmarketplace" (default) | "openvsx"
 
   omz:
     enabled: true
@@ -70,9 +84,13 @@ providers:
     enabled: true
     notify: true            # send macOS notification when new version available
 
-  virtualbox:
+  mas:
     enabled: true
-    notify: true            # send macOS notification when new version available
+    skip: []                # app names to skip (e.g. ["Xcode"])
+
+  macports:
+    enabled: true
+    skip: []                # port names to skip
 
 notifications:
   enabled: true
