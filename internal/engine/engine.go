@@ -234,6 +234,10 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 		})
 
 		// Wire deferred cask state: if brew-cask deferred casks, store script path.
+		// A clean brew-cask run with nothing deferred clears the previous run's deferred list.
+		if name == "brew-cask" && len(result.Deferred) == 0 && result.Error == nil {
+			e.state.Deferred = state.DeferredState{}
+		}
 		if name == "brew-cask" && len(result.Deferred) > 0 {
 			scriptPath, pathErr := provider.DeferredScriptPath()
 			if pathErr != nil {

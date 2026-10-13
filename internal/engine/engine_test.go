@@ -774,6 +774,28 @@ func TestExecute_ParallelExecution(t *testing.T) {
 	}
 }
 
+func TestEngine_CleanBrewCaskRunClearsStaleDeferred(t *testing.T) {
+	cfg, st, logger := engineTestFixtures(t)
+	st.Deferred = state.DeferredState{Casks: []string{"docker"}, Script: "/old/deferred-cask.sh"}
+	eng := engine.New(cfg, st, logger)
+
+	err := eng.Run(context.Background(), engine.Options{
+		Providers: []provider.Provider{&mockProvider{
+			name:         "brew-cask",
+			scanResult:   provider.ScanResult{Available: true, Outdated: []provider.OutdatedItem{{Name: "firefox"}}},
+			updateResult: provider.UpdateResult{Updated: []string{"firefox"}},
+		}},
+		Yes:    true,
+		Output: &strings.Builder{},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(st.Deferred.Casks) != 0 || st.Deferred.Script != "" {
+		t.Errorf("expected deferred state cleared, got %+v", st.Deferred)
+	}
+}
+
 func TestEngine_CancelledDuringScanSkipsUpdate(t *testing.T) {
 	cfg, st, logger := engineTestFixtures(t)
 	eng := engine.New(cfg, st, logger)
