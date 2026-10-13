@@ -62,7 +62,9 @@ release:
     name: upkeep
   draft: false
   prerelease: auto
-  # release-please creates the tag + GitHub Release (with the changelog as
-  # its body) before this tag push triggers GoReleaser — keep its notes
-  # intact and only attach build artifacts to the existing release.
+  # release-please creates the tag + a draft GitHub Release (with the
+  # changelog as its body). The repo uses immutable releases, so assets must
+  # be attached to that draft before it's published: keep its notes, upload,
+  # then publish (draft: false).
   mode: keep-existing
+  use_existing_draft: true
