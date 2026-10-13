@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0](https://github.com/teknikqa/upkeep/compare/v1.0.3...v1.1.0) (2026-10-13)
+
+
+### Added
+
+* **config:** add missing providers to config editor and sync example config ([#67](https://github.com/teknikqa/upkeep/issues/67)) ([763b605](https://github.com/teknikqa/upkeep/commit/763b60500f81cc5df0738f32ece772aa7b3b7829))
+* **config:** warn about unknown config keys ([#69](https://github.com/teknikqa/upkeep/issues/69)) ([90e916a](https://github.com/teknikqa/upkeep/commit/90e916adc52e69ad17cc99bf8691b7dd21f22ee0))
+
+
+### Fixed
+
+* **brew-cask:** read uninstall stanzas from artifacts in the auth heuristic ([#72](https://github.com/teknikqa/upkeep/issues/72)) ([f8057cb](https://github.com/teknikqa/upkeep/commit/f8057cb1e79c8bc0f872cdc7815fe1a154c0de07))
+* **vagrant:** report only plugins with a newer release ([#70](https://github.com/teknikqa/upkeep/issues/70)) ([44ad9fc](https://github.com/teknikqa/upkeep/commit/44ad9fcb15c28dd496e64c8e0fa3d04cf5abb14d))
+
 ## [1.0.3](https://github.com/teknikqa/upkeep/compare/v1.0.2...v1.0.3) (2026-10-13)
 
 
