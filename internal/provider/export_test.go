@@ -44,6 +44,11 @@ func (p *BrewCaskProvider) DetectAuthRequired(ctx context.Context, name string) 
 	return p.detectAuthRequired(ctx, name)
 }
 
+// CaskInfoNeedsAuth exposes caskInfoNeedsAuth for testing.
+func CaskInfoNeedsAuth(infoJSON string) bool {
+	return caskInfoNeedsAuth(infoJSON)
+}
+
 // BuildDeferredScript builds the deferred cask script content for testing.
 func BuildDeferredScript(casks []string) string {
 	p := &BrewCaskProvider{}

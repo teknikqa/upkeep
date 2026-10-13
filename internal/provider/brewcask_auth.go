@@ -13,8 +13,8 @@ package provider
 //
 //  3. Heuristic fallback (heuristicAuthRequired): Inspects `brew info --cask
 //     --json=v2 <name>` metadata for artifact types (pkg, installer, postflight,
-//     preflight) and uninstall stanzas (launchctl, kext, pkgutil, privileged
-//     /Library/ deletes) that typically require admin privileges.
+//     preflight) and uninstall stanzas (kext, pkgutil, privileged /Library/
+//     deletes) that typically require admin privileges.
 
 import (
 	"context"
@@ -28,9 +28,10 @@ type brewCaskInfoV2 struct {
 }
 
 // brewCaskInfo holds the fields of a single cask relevant to auth detection.
+// Homebrew nests uninstall stanzas inside artifacts, e.g.
+// {"uninstall": [{"launchctl": [...], "delete": [...]}]}.
 type brewCaskInfo struct {
-	Artifacts []interface{}            `json:"artifacts"`
-	Uninstall []map[string]interface{} `json:"uninstall"`
+	Artifacts []interface{} `json:"artifacts"`
 }
 
 // detectAuthRequired determines whether a cask requires admin auth to update.
@@ -73,28 +74,35 @@ func (p *BrewCaskProvider) probeAuthRequired(ctx context.Context, name string) (
 }
 
 // heuristicAuthRequired checks brew cask metadata for signs of privileged install.
-// It examines artifact types (pkg, installer, postflight, preflight) and uninstall
-// stanzas (launchctl, kext, pkgutil, /Library/ deletes) that typically require root.
 func (p *BrewCaskProvider) heuristicAuthRequired(ctx context.Context, name string) bool {
 	stdout, _, err := RunCommand(ctx, "brew", "info", "--cask", "--json=v2", name)
 	if err != nil {
 		return false
 	}
+	return caskInfoNeedsAuth(stdout)
+}
 
+// caskInfoNeedsAuth reports whether `brew info --cask --json=v2` output shows
+// artifacts that typically need root: a pkg or installer, pre/postflight
+// steps, or an uninstall stanza that touches kexts, pkg receipts or paths
+// under /Library/.
+func caskInfoNeedsAuth(infoJSON string) bool {
 	var info brewCaskInfoV2
-	if err := json.Unmarshal([]byte(stdout), &info); err != nil || len(info.Casks) == 0 {
+	if err := json.Unmarshal([]byte(infoJSON), &info); err != nil || len(info.Casks) == 0 {
 		return false
 	}
-	cask := info.Casks[0]
-
-	// Check artifacts for pkg, installer, postflight, preflight.
-	for _, a := range cask.Artifacts {
+	for _, a := range info.Casks[0].Artifacts {
 		switch v := a.(type) {
 		case map[string]interface{}:
-			for key := range v {
+			for key, val := range v {
 				switch key {
-				case "pkg", "installer", "postflight", "preflight":
+				// Current Homebrew names these *_steps; older versions used the bare name.
+				case "pkg", "installer", "preflight", "postflight", "preflight_steps", "postflight_steps":
 					return true
+				case "uninstall":
+					if privilegedUninstall(val) {
+						return true
+					}
 				}
 			}
 		case string:
@@ -103,29 +111,28 @@ func (p *BrewCaskProvider) heuristicAuthRequired(ctx context.Context, name strin
 			}
 		}
 	}
+	return false
+}
 
-	// Check uninstall stanzas for privileged operations.
-	privilegedKeys := []string{"launchctl", "kext", "pkgutil"}
-	for _, stanza := range cask.Uninstall {
-		for key, val := range stanza {
-			// Check well-known privileged keys.
-			for _, pk := range privilegedKeys {
-				if key == pk {
-					return true
+// privilegedUninstall reports whether an uninstall artifact's stanzas need root.
+func privilegedUninstall(val interface{}) bool {
+	stanzas, _ := val.([]interface{})
+	for _, s := range stanzas {
+		stanza, _ := s.(map[string]interface{})
+		for key, v := range stanza {
+			switch key {
+			// launchctl is left out: Electron apps' per-user ShipIt updaters use
+			// it too (VS Code, Slack), and removing those needs no root.
+			case "kext", "pkgutil":
+				return true
+			case "delete":
+				paths, ok := v.([]interface{})
+				if !ok {
+					paths = []interface{}{v}
 				}
-			}
-			// Check "delete" paths under /Library/.
-			if key == "delete" {
-				switch v := val.(type) {
-				case string:
-					if strings.HasPrefix(v, "/Library/") {
+				for _, path := range paths {
+					if str, ok := path.(string); ok && strings.HasPrefix(str, "/Library/") {
 						return true
-					}
-				case []interface{}:
-					for _, s := range v {
-						if str, ok := s.(string); ok && strings.HasPrefix(str, "/Library/") {
-							return true
-						}
 					}
 				}
 			}
