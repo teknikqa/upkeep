@@ -2,8 +2,10 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +13,9 @@ import (
 	upkeeperrors "github.com/teknikqa/upkeep/internal/errors"
 	"gopkg.in/yaml.v3"
 )
+
+// warnOutput receives warnings about settings Load ignores.
+var warnOutput io.Writer = os.Stderr
 
 // DefaultConfigPath returns the default config file path.
 func DefaultConfigPath() string {
@@ -280,8 +285,8 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("reading config file %q: %w", path, err)
 	}
 
-	// Unmarshal into the defaults struct so unset fields keep their defaults.
-	if err := yaml.Unmarshal(data, cfg); err != nil {
+	// Decode into the defaults struct so unset fields keep their defaults.
+	if err := decodeStrict(data, cfg); err != nil {
 		return nil, fmt.Errorf("parsing config file %q: %w", path, err)
 	}
 
@@ -293,6 +298,33 @@ func Load(path string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// decodeStrict decodes data into cfg, warning about unknown keys (typos,
+// removed settings) instead of failing, so an old config keeps working.
+func decodeStrict(data []byte, cfg *Config) error {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	err := dec.Decode(cfg)
+	if err == nil || errors.Is(err, io.EOF) {
+		return nil
+	}
+	var typeErr *yaml.TypeError
+	if !errors.As(err, &typeErr) {
+		return err
+	}
+	var fatal []string
+	for _, msg := range typeErr.Errors {
+		if strings.Contains(msg, " not found in type ") {
+			fmt.Fprintf(warnOutput, "warning: ignoring unknown config setting: %s\n", msg)
+		} else {
+			fatal = append(fatal, msg)
+		}
+	}
+	if len(fatal) > 0 {
+		return &yaml.TypeError{Errors: fatal}
+	}
+	return nil
 }
 
 // expandHomePaths expands ~ in all path-valued config fields.
