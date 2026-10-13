@@ -139,11 +139,13 @@ func (s *State) Save() error {
 	return nil
 }
 
-// GetFailed returns the names of providers that have status "failed".
+// GetFailed returns the names of providers that failed outright, plus
+// "partial" ones with failed packages. Deferred-only partials are excluded:
+// re-running them just defers the same casks again.
 func (s *State) GetFailed() []string {
 	var failed []string
 	for name, ps := range s.Providers {
-		if ps.Status == "failed" {
+		if ps.Status == "failed" || (ps.Status == "partial" && len(ps.Failed) > 0) {
 			failed = append(failed, name)
 		}
 	}

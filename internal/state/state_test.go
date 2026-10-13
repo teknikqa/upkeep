@@ -74,6 +74,8 @@ func TestGetFailed(t *testing.T) {
 	s.SetProviderResult("npm", state.ProviderStatus{Status: "failed"})
 	s.SetProviderResult("pip", state.ProviderStatus{Status: "failed"})
 	s.SetProviderResult("rust", state.ProviderStatus{Status: "partial"})
+	s.SetProviderResult("brew-cask", state.ProviderStatus{Status: "partial", Deferred: []string{"docker"}})
+	s.SetProviderResult("uv", state.ProviderStatus{Status: "partial", Failed: []string{"ruff"}})
 
 	if err := s.Save(); err != nil {
 		t.Fatalf("Save: %v", err)
@@ -85,16 +87,16 @@ func TestGetFailed(t *testing.T) {
 	}
 
 	failed := loaded.GetFailed()
-	if len(failed) != 2 {
-		t.Errorf("expected 2 failed providers, got %d: %v", len(failed), failed)
+	if len(failed) != 3 {
+		t.Errorf("expected 3 failed providers, got %d: %v", len(failed), failed)
 	}
 	// Ensure npm and pip are in the failed list.
 	failedSet := make(map[string]bool)
 	for _, f := range failed {
 		failedSet[f] = true
 	}
-	if !failedSet["npm"] || !failedSet["pip"] {
-		t.Errorf("expected npm and pip in failed list, got %v", failed)
+	if !failedSet["npm"] || !failedSet["pip"] || !failedSet["uv"] {
+		t.Errorf("expected npm, pip and uv in failed list, got %v", failed)
 	}
 }
 
