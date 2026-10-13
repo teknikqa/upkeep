@@ -2,6 +2,8 @@ package provider_test
 
 import (
 	"context"
+	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/teknikqa/upkeep/internal/config"
@@ -126,5 +128,43 @@ func TestNpmProvider_Update_ItemsAccountedFor(t *testing.T) {
 	total := len(result.Updated) + len(result.Failed)
 	if total != 2 {
 		t.Errorf("expected 2 items accounted for, got updated=%v failed=%v", result.Updated, result.Failed)
+	}
+}
+
+func TestNpmScan(t *testing.T) {
+	tests := []struct {
+		name      string
+		outdated  fakeResponse
+		wantNames []string
+		wantErr   bool
+	}{
+		// npm exits 1 whenever something is outdated.
+		{"outdated packages", fakeResponse{stdout: sampleNpmOutdated, exit: 1}, []string{"npm", "typescript"}, false},
+		{"empty output", fakeResponse{}, nil, false},
+		{"empty object", fakeResponse{stdout: "{}"}, nil, false},
+		{"bad json", fakeResponse{stdout: "not json", exit: 1}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bin := isolatedPath(t)
+			fakeCommand(t, bin, "npm", map[string]fakeResponse{"outdated -g --json": tt.outdated})
+
+			res := provider.NewNpmProvider(config.NpmConfig{}, nil).Scan(context.Background())
+			if !res.Available || (res.Error != nil) != tt.wantErr {
+				t.Fatalf("unexpected result %+v", res)
+			}
+			got := itemNames(res.Outdated)
+			sort.Strings(got)
+			if len(got)+len(tt.wantNames) > 0 && !reflect.DeepEqual(got, tt.wantNames) {
+				t.Errorf("got %v, want %v", got, tt.wantNames)
+			}
+		})
+	}
+}
+
+func TestNpmScan_NotInstalled(t *testing.T) {
+	isolatedPath(t)
+	if res := provider.NewNpmProvider(config.NpmConfig{}, nil).Scan(context.Background()); res.Available {
+		t.Errorf("expected unavailable, got %+v", res)
 	}
 }

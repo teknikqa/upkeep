@@ -2,6 +2,7 @@ package provider_test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/teknikqa/upkeep/internal/config"
@@ -94,5 +95,43 @@ func TestBrewProvider_Update_WithPostHooks(t *testing.T) {
 	total := len(result.Updated) + len(result.Failed)
 	if total != 1 {
 		t.Errorf("expected 1 item accounted for, got updated=%v failed=%v", result.Updated, result.Failed)
+	}
+}
+
+func TestBrewScan_NotInstalled(t *testing.T) {
+	isolatedPath(t)
+	if res := provider.NewBrewProvider(config.BrewConfig{}, nil).Scan(context.Background()); res.Available {
+		t.Errorf("expected unavailable, got %+v", res)
+	}
+}
+
+func TestBrewScan(t *testing.T) {
+	tests := []struct {
+		name      string
+		outdated  fakeResponse
+		wantNames []string
+		wantErr   bool
+	}{
+		{"outdated formulae", fakeResponse{stdout: brewOutdatedJSON}, []string{"git", "jq"}, false},
+		{"outdated fails", fakeResponse{stderr: "boom", exit: 1}, nil, true},
+		{"bad json", fakeResponse{stdout: "not json"}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bin := isolatedPath(t)
+			fakeCommand(t, bin, "brew", map[string]fakeResponse{
+				// A failed index refresh is logged, not fatal.
+				"update --quiet":     {exit: 1},
+				"outdated --json=v2": tt.outdated,
+			})
+
+			res := provider.NewBrewProvider(config.BrewConfig{}, nil).Scan(context.Background())
+			if !res.Available || (res.Error != nil) != tt.wantErr {
+				t.Fatalf("unexpected result %+v", res)
+			}
+			if got := itemNames(res.Outdated); !reflect.DeepEqual(got, tt.wantNames) && len(got)+len(tt.wantNames) > 0 {
+				t.Errorf("got %v, want %v", got, tt.wantNames)
+			}
+		})
 	}
 }
