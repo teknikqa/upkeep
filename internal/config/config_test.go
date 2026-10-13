@@ -2,8 +2,10 @@ package config_test
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -88,6 +90,52 @@ func TestLoad_InvalidYAMLReturnsError(t *testing.T) {
 	_, err := config.Load(f)
 	if err == nil {
 		t.Fatal("expected error for invalid YAML, got nil")
+	}
+}
+
+func TestLoad_UnknownKeysWarnInsteadOfFailing(t *testing.T) {
+	var warnings bytes.Buffer
+	defer config.SetWarnOutput(&warnings)()
+	f := writeTempFile(t, `
+providers:
+  npm:
+    enabled: false
+  brew:
+    skp: ["go"]
+  virtualbox:
+    enabled: true
+`)
+
+	cfg, err := config.Load(f)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Providers.Npm.Enabled {
+		t.Error("known settings next to unknown ones must still apply")
+	}
+	for _, key := range []string{"field skp not found", "field virtualbox not found"} {
+		if !strings.Contains(warnings.String(), key) {
+			t.Errorf("warnings missing %q:\n%s", key, warnings.String())
+		}
+	}
+}
+
+func TestLoad_TypeErrorStillFailsAlongsideUnknownKey(t *testing.T) {
+	defer config.SetWarnOutput(io.Discard)()
+	f := writeTempFile(t, "parallelism: lots\nnope: 1\n")
+
+	if _, err := config.Load(f); err == nil {
+		t.Fatal("expected error for non-integer parallelism")
+	}
+}
+
+func TestLoad_EmptyFileReturnsDefaults(t *testing.T) {
+	cfg, err := config.Load(writeTempFile(t, ""))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Parallelism != 4 {
+		t.Errorf("expected default parallelism=4, got %d", cfg.Parallelism)
 	}
 }
 
