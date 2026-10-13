@@ -186,11 +186,9 @@ func TestMasProvider_Update_Empty(t *testing.T) {
 
 func TestMasProvider_Update_ItemsAccountedFor(t *testing.T) {
 	p := provider.NewMasProvider(config.MasConfig{Enabled: true}, nil)
-	// Fake app IDs that don't correspond to real installed apps, so the
-	// batch and per-item fallback both fail — but every item must still be
-	// accounted for. This also exercises the sudo -v pre-cache: with no tty
-	// and no cached ticket it fails fast rather than hanging (verified
-	// manually before adding this test).
+	// sudo and the batch and per-item upgrades all fail, but every item must
+	// still be accounted for.
+	failingCommands(t, "sudo", "mas")
 	items := []provider.OutdatedItem{
 		{Name: "mas-nonexistent-app-aaa", AppID: "1"},
 		{Name: "mas-nonexistent-app-bbb", AppID: "2"},

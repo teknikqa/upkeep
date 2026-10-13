@@ -173,10 +173,9 @@ func TestMacportsProvider_Update_Empty(t *testing.T) {
 
 func TestMacportsProvider_Update_ItemsAccountedFor(t *testing.T) {
 	p := provider.NewMacportsProvider(config.MacportsConfig{Enabled: true}, nil)
-	// Fake port names that don't correspond to real installed ports, so the
-	// batch and per-item fallback both fail — but every item must still be
-	// accounted for. This also exercises the sudo -v pre-cache: with no tty
-	// and no cached ticket it fails fast rather than hanging.
+	// sudo and the batch and per-item upgrades all fail, but every item must
+	// still be accounted for.
+	failingCommands(t, "sudo", "port")
 	items := []provider.OutdatedItem{
 		{Name: "macports-nonexistent-port-aaa"},
 		{Name: "macports-nonexistent-port-bbb"},
