@@ -1,16 +1,11 @@
 name: Release
 
-# Tags that release-please creates with GITHUB_TOKEN don't fire `push`, so
-# release-please.yml calls this workflow directly. workflow_dispatch reruns a tag.
+# release-please pushes tags with an app token, so `push` fires for them.
+# workflow_dispatch reruns an existing tag.
 on:
   push:
     tags:
       - "v*"
-  workflow_call:
-    inputs:
-      tag:
-        type: string
-        required: true
   workflow_dispatch:
     inputs:
       tag:

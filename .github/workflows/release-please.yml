@@ -5,24 +5,21 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@v5
-        id: release
-    outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
+      # An app token (not GITHUB_TOKEN) so the release PR runs CI without
+      # approval and the tag push triggers release.yml.
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
-  goreleaser:
-    needs: release-please
-    if: ${{ needs.release-please.outputs.release_created }}
-    uses: ./.github/workflows/release.yml
-    with:
-      tag: ${{ needs.release-please.outputs.tag_name }}
-    secrets: inherit
+      - uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ steps.app-token.outputs.token }}
