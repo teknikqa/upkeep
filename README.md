@@ -39,7 +39,7 @@ A Go CLI tool that keeps your macOS development environment up to date.
 | `pnpm` | Globally-installed pnpm packages | `pnpm` — requires `pnpm setup` to have added its global bin dir to `PATH`; otherwise this provider reports 0 outdated |
 | `rust` | Rust toolchains (rustup) and cargo-installed binaries | `rustup`, [`cargo-update`](https://github.com/nabijaczleweli/cargo-update) |
 | `uv` | [`uv`](https://docs.astral.sh/uv/) itself and globally-installed `uv tool` packages | `uv` — self-update only works for standalone installs; brew/pip-installed `uv` skips that step |
-| `vagrant` | Vagrant boxes | `vagrant` |
+| `vagrant` | Vagrant plugins, checked against RubyGems; new Vagrant releases trigger a notification instead of an auto-update | `vagrant` |
 | `vim` | Vim plugins (vim-plug or pathogen) | Vim + a supported plugin manager |
 | `yarn` | Globally-installed Yarn (classic) packages | `yarn` — Yarn Classic (1.x) has no per-package outdated listing, so this runs a wholesale `yarn global upgrade`; Yarn Berry (2.x+) removed `yarn global` entirely, so this provider detects Berry and skips with a message instead |
 
