@@ -60,15 +60,25 @@ Examples:
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
-	// First Ctrl-C cancels the context so running updates stop and state is
-	// saved; stop() then restores default handling so a second Ctrl-C force-quits.
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	go func() { <-ctx.Done(); stop() }()
-	err := rootCmd.ExecuteContext(ctx)
-	stop()
-	if err != nil {
+	if err := execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+// execute runs the root command with a signal-aware context.
+func execute() error {
+	ctx, stop := signalContext()
+	defer stop()
+	return rootCmd.ExecuteContext(ctx)
+}
+
+// signalContext returns a context cancelled by the first SIGINT/SIGTERM, so
+// running updates stop and state is saved. It then restores default signal
+// handling so a second Ctrl-C force-quits.
+func signalContext() (context.Context, context.CancelFunc) {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	go func() { <-ctx.Done(); stop() }()
+	return ctx, stop
 }
 
 func init() {

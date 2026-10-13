@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"syscall"
 	"testing"
 	"time"
 
@@ -103,5 +104,30 @@ func TestFilterEnabledProviders_EmptyInput(t *testing.T) {
 	result := filterEnabledProviders(nil, cfg)
 	if len(result) != 0 {
 		t.Errorf("expected empty result for nil input, got %d", len(result))
+	}
+}
+
+func TestSignalContext_CancelledBySIGINT(t *testing.T) {
+	ctx, stop := signalContext()
+	defer stop()
+
+	if err := syscall.Kill(syscall.Getpid(), syscall.SIGINT); err != nil {
+		t.Fatalf("sending SIGINT: %v", err)
+	}
+	select {
+	case <-ctx.Done():
+	case <-time.After(2 * time.Second):
+		t.Fatal("context not cancelled after SIGINT")
+	}
+}
+
+func TestExecute_RunsRootCommand(t *testing.T) {
+	rootCmd.SetArgs([]string{"--list"})
+	t.Cleanup(func() {
+		rootCmd.SetArgs(nil)
+		list = false
+	})
+	if err := execute(); err != nil {
+		t.Fatalf("execute: %v", err)
 	}
 }

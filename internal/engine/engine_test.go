@@ -818,3 +818,40 @@ func TestEngine_CancelledDuringScanSkipsUpdate(t *testing.T) {
 		t.Error("update should not run after the scan was cancelled")
 	}
 }
+
+// cancellingProvider cancels the run's context from inside Update, simulating
+// Ctrl-C while an update is in progress.
+type cancellingProvider struct {
+	mockProvider
+	cancel context.CancelFunc
+}
+
+func (c *cancellingProvider) Update(ctx context.Context, _ []provider.OutdatedItem) provider.UpdateResult {
+	c.cancel()
+	return provider.UpdateResult{Error: ctx.Err()}
+}
+
+func TestEngine_CancelledDuringUpdateSavesStateAndReturnsCanceled(t *testing.T) {
+	cfg, st, logger := engineTestFixtures(t)
+	eng := engine.New(cfg, st, logger)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err := eng.Run(ctx, engine.Options{
+		Providers: []provider.Provider{&cancellingProvider{
+			mockProvider: mockProvider{
+				name:       "brew",
+				scanResult: provider.ScanResult{Available: true, Outdated: []provider.OutdatedItem{{Name: "git"}}},
+			},
+			cancel: cancel,
+		}},
+		Yes:    true,
+		Output: &strings.Builder{},
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+	if st.Providers["brew"].Status != "failed" {
+		t.Errorf("expected interrupted provider saved as failed, got %+v", st.Providers["brew"])
+	}
+}
