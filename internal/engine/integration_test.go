@@ -101,8 +101,8 @@ func TestIntegration_MixedSuccessFailureDeferred(t *testing.T) {
 		Yes:       true, // skip confirmation prompt
 		Output:    &buf,
 	})
-	if err != nil {
-		t.Fatalf("engine.Run: %v", err)
+	if !errors.Is(err, engine.ErrProvidersFailed) {
+		t.Fatalf("engine.Run: expected ErrProvidersFailed, got %v", err)
 	}
 
 	// --- Verify state was saved correctly ---

@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"context"
+	"io"
+	"os"
+	"syscall"
 	"testing"
 	"time"
 
@@ -103,5 +106,49 @@ func TestFilterEnabledProviders_EmptyInput(t *testing.T) {
 	result := filterEnabledProviders(nil, cfg)
 	if len(result) != 0 {
 		t.Errorf("expected empty result for nil input, got %d", len(result))
+	}
+}
+
+func TestSignalContext_CancelledBySIGINT(t *testing.T) {
+	ctx, stop := signalContext()
+	defer stop()
+
+	if err := syscall.Kill(syscall.Getpid(), syscall.SIGINT); err != nil {
+		t.Fatalf("sending SIGINT: %v", err)
+	}
+	select {
+	case <-ctx.Done():
+	case <-time.After(2 * time.Second):
+		t.Fatal("context not cancelled after SIGINT")
+	}
+}
+
+func TestExecute_RunsRootCommand(t *testing.T) {
+	rootCmd.SetArgs([]string{"--list"})
+	t.Cleanup(func() {
+		rootCmd.SetArgs(nil)
+		list = false
+	})
+	if err := execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+}
+
+func TestExecute_ExitsNonZeroOnError(t *testing.T) {
+	rootCmd.SetArgs([]string{"--bogus-flag"})
+	rootCmd.SetOut(io.Discard)
+	rootCmd.SetErr(io.Discard)
+	code := -1
+	osExit = func(c int) { code = c }
+	t.Cleanup(func() {
+		rootCmd.SetArgs(nil)
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+		osExit = os.Exit
+	})
+
+	Execute()
+	if code != 1 {
+		t.Errorf("expected exit code 1, got %d", code)
 	}
 }

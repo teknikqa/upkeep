@@ -4,6 +4,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,6 +16,10 @@ import (
 	"github.com/teknikqa/upkeep/internal/state"
 	"github.com/teknikqa/upkeep/internal/ui"
 )
+
+// ErrProvidersFailed is returned by Run when at least one provider had an
+// update error or failed packages, so callers can exit non-zero.
+var ErrProvidersFailed = errors.New("provider(s) failed")
 
 // Options controls the engine pipeline.
 type Options struct {
@@ -127,6 +132,11 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 		scanTableLines = ui.RenderScanSummaryTable(summaryRows)
 	}
 
+	// Interrupted during scan: don't prompt or update with partial results.
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
 	// Phase 3: Dry-run check.
 	if opts.DryRun {
 		fmt.Fprintln(out, "\n[dry-run] Stopping before execution.")
@@ -189,7 +199,11 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 	// Phase 6: Save state.
 	e.state.LastRun = time.Now()
 	e.state.DurationSeconds = totalDuration.Seconds()
+	failedCount := 0
 	for name, result := range updateResults {
+		if result.Error != nil || len(result.Failed) > 0 {
+			failedCount++
+		}
 		errStr := (*string)(nil)
 		if result.Error != nil {
 			s := result.Error.Error()
@@ -220,6 +234,10 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 		})
 
 		// Wire deferred cask state: if brew-cask deferred casks, store script path.
+		// A clean brew-cask run with nothing deferred clears the previous run's deferred list.
+		if name == "brew-cask" && len(result.Deferred) == 0 && result.Error == nil {
+			e.state.Deferred = state.DeferredState{}
+		}
 		if name == "brew-cask" && len(result.Deferred) > 0 {
 			scriptPath, pathErr := provider.DeferredScriptPath()
 			if pathErr != nil {
@@ -236,6 +254,12 @@ func (e *Engine) Run(ctx context.Context, opts Options) error {
 		e.logger.Warn("failed to save state: %v", saveErr)
 	}
 
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if failedCount > 0 {
+		return fmt.Errorf("%d %w", failedCount, ErrProvidersFailed)
+	}
 	return nil
 }
 

@@ -2,8 +2,11 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -46,6 +49,8 @@ Examples:
   upkeep --run-deferred     # Run deferred auth-required cask updates
   upkeep --list             # List all available providers`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Args parsed fine; runtime errors (e.g. failed providers) shouldn't print usage.
+		cmd.SilenceUsage = true
 		if list {
 			return runList()
 		}
@@ -55,10 +60,28 @@ Examples:
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
+	if err := execute(); err != nil {
+		osExit(1)
 	}
+}
+
+// osExit is swapped in tests so Execute's failure path can run in-process.
+var osExit = os.Exit
+
+// execute runs the root command with a signal-aware context.
+func execute() error {
+	ctx, stop := signalContext()
+	defer stop()
+	return rootCmd.ExecuteContext(ctx)
+}
+
+// signalContext returns a context cancelled by the first SIGINT/SIGTERM, so
+// running updates stop and state is saved. It then restores default signal
+// handling so a second Ctrl-C force-quits.
+func signalContext() (context.Context, context.CancelFunc) {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	go func() { <-ctx.Done(); stop() }()
+	return ctx, stop
 }
 
 func init() {
