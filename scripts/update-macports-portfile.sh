@@ -8,6 +8,11 @@ VERSION="${1:?usage: update-macports-portfile.sh <version, e.g. 0.11.1>}"
 : "${MACPORTS_TAP_GITHUB_TOKEN:?MACPORTS_TAP_GITHUB_TOKEN must be set}"
 
 TAP_REPO="teknikqa/macports-ports"
+# git push doesn't update the token's "Last used", so make one API call to
+# keep GitHub from treating it as unused and auto-revoking it.
+curl -fsS -o /dev/null -H "Authorization: Bearer ${MACPORTS_TAP_GITHUB_TOKEN}" \
+  "https://api.github.com/repos/${TAP_REPO}"
+
 PORTFILE="sysutils/upkeep/Portfile"
 RELEASE_BASE="https://github.com/teknikqa/upkeep/releases/download/v${VERSION}"
 
