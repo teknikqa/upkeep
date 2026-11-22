@@ -24,9 +24,10 @@ type providerUpdateState struct {
 	skippedCount  int
 	failedCount   int
 	duration      time.Duration
-	startTime     time.Time // set when status becomes "updating"
-	currentPkg    string    // package currently being processed (for footer)
-	packages      []string  // accumulated package names (all outcomes) for the Packages column
+	startTime     time.Time       // set when status becomes "updating"
+	inferred      map[string]bool // packages shown done only because the next one started
+	currentPkg    string          // package currently being processed (for footer)
+	packages      []string        // accumulated package names (all outcomes) for the Packages column
 }
 
 // LiveUpdateTable renders the scan summary table as a live-updating view during
@@ -145,15 +146,20 @@ func (t *LiveUpdateTable) OnPackageProgress(providerName string, progress provid
 
 	switch progress.Status {
 	case provider.PackageStarting:
-		if slices.Contains(s.packages, progress.Name) {
-			// Retry (batch failed, per-package fallback): every package we
-			// inferred as done has an unknown outcome again, including the
-			// one that was running when the batch died.
-			s.packages = nil
+		if s.inferred[progress.Name] {
+			// Retry (batch failed, per-package fallback): packages we only
+			// inferred as done have an unknown outcome again. Confirmed
+			// results stay.
+			s.packages = slices.DeleteFunc(s.packages, func(p string) bool { return s.inferred[p] })
+			clear(s.inferred)
 		} else if s.currentPkg != "" && s.currentPkg != progress.Name && !slices.Contains(s.packages, s.currentPkg) {
 			// A batched upgrade never reports completion per package, so a
 			// new start means the previous package has finished.
 			s.packages = append(s.packages, s.currentPkg)
+			if s.inferred == nil {
+				s.inferred = map[string]bool{}
+			}
+			s.inferred[s.currentPkg] = true
 		}
 		// Record which package is about to be processed (for the footer).
 		s.currentPkg = progress.Name
@@ -172,6 +178,7 @@ func (t *LiveUpdateTable) OnPackageProgress(providerName string, progress provid
 	}
 
 	// Record the package name for the Packages column.
+	delete(s.inferred, progress.Name) // outcome now confirmed
 	if progress.Name != "" && !slices.Contains(s.packages, progress.Name) {
 		s.packages = append(s.packages, progress.Name)
 	}

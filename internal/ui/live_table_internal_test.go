@@ -738,3 +738,22 @@ func TestOnPackageProgress_RetryAfterBatchFailure(t *testing.T) {
 		t.Errorf("packages=%v current=%q, want none done and a current", s.packages, s.currentPkg)
 	}
 }
+
+// TestOnPackageProgress_RetryKeepsConfirmed verifies a retry reset only drops
+// inferred completions, not confirmed ones.
+func TestOnPackageProgress_RetryKeepsConfirmed(t *testing.T) {
+	lt := &LiveUpdateTable{
+		states: map[string]*providerUpdateState{"brew": {status: "updating"}},
+	}
+	st := func(n string) {
+		lt.OnPackageProgress("brew", provider.PackageProgress{Name: n, Status: provider.PackageStarting})
+	}
+	st("b")
+	st("c") // b inferred done; batch then fails
+	st("a")
+	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "a", Status: provider.PackageUpdated})
+	st("b") // retry: inferred b and c are unknown again
+	if got := strings.Join(lt.states["brew"].packages, ","); got != "a" {
+		t.Errorf("packages = %q, want %q", got, "a")
+	}
+}
