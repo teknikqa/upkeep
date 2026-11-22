@@ -21,6 +21,9 @@ const (
 	PackageSkipped PackageStatus = "skipped"
 	// PackageStarting means the package is about to be processed.
 	PackageStarting PackageStatus = "starting"
+	// PackageBatchStarting is PackageStarting for one package of a sequential
+	// batched command; the previous package of that batch has finished.
+	PackageBatchStarting PackageStatus = "batch-starting"
 )
 
 // PackageProgress reports the completion of a single package within a provider.
