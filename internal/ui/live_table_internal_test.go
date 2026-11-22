@@ -1,8 +1,11 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/teknikqa/upkeep/internal/provider"
 )
 
 // TestReportColumns_Pending verifies that pending providers show dashes.
@@ -694,4 +697,28 @@ func searchString(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// TestOnPackageProgress_BatchStartMovesPreviousToDone verifies that in a
+// batched upgrade (Starting events only), the previous package leaves the
+// "Remaining" list when the next one starts, and is not duplicated when the
+// final Updated event arrives.
+func TestOnPackageProgress_BatchStartMovesPreviousToDone(t *testing.T) {
+	lt := &LiveUpdateTable{
+		states: map[string]*providerUpdateState{"brew": {status: "updating"}},
+	}
+	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "a", Status: provider.PackageStarting})
+	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "b", Status: provider.PackageStarting})
+	s := lt.states["brew"]
+	if got := strings.Join(s.packages, ","); got != "a" {
+		t.Fatalf("packages after b starts = %q, want %q", got, "a")
+	}
+	got := formatUpdatingPackages(s.packages, []string{"a", "b", "c"}, s.currentPkg, 200)
+	if want := "a | Updating: b | Remaining: c"; len(got) != 1 || got[0] != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "a", Status: provider.PackageUpdated})
+	if n := len(s.packages); n != 1 {
+		t.Errorf("Updated for an already-listed package duplicated it: %v", s.packages)
+	}
 }

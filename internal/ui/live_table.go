@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -144,6 +145,12 @@ func (t *LiveUpdateTable) OnPackageProgress(providerName string, progress provid
 
 	switch progress.Status {
 	case provider.PackageStarting:
+		// A batched upgrade never reports completion per package, so a new
+		// start means the previous package has finished: move it out of the
+		// "Remaining" list.
+		if s.currentPkg != "" && s.currentPkg != progress.Name && !slices.Contains(s.packages, s.currentPkg) {
+			s.packages = append(s.packages, s.currentPkg)
+		}
 		// Record which package is about to be processed (for the footer).
 		s.currentPkg = progress.Name
 		if IsTTY() {
@@ -161,7 +168,7 @@ func (t *LiveUpdateTable) OnPackageProgress(providerName string, progress provid
 	}
 
 	// Record the package name for the Packages column.
-	if progress.Name != "" {
+	if progress.Name != "" && !slices.Contains(s.packages, progress.Name) {
 		s.packages = append(s.packages, progress.Name)
 	}
 
