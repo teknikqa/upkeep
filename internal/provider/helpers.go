@@ -235,7 +235,7 @@ func RunCommandEnvStreamWithLog(ctx context.Context, logger *logging.Logger, env
 }
 
 // OnUpgradeProgressLine returns an onLine callback for RunCommandStreamWithLog
-// / RunCommandEnvStreamWithLog that reports PackageStarting when line is one
+// / RunCommandEnvStreamWithLog that reports PackageBatchStarting when line is one
 // of Homebrew's own "==> Upgrading <name>" progress markers for a name in
 // tracked. Used to surface real per-package progress from a single batched
 // `brew upgrade` invocation without running one process per package; names
@@ -244,7 +244,7 @@ func RunCommandEnvStreamWithLog(ctx context.Context, logger *logging.Logger, env
 func OnUpgradeProgressLine(ctx context.Context, tracked map[string]bool) func(string) {
 	return func(line string) {
 		if pkg, ok := strings.CutPrefix(line, "==> Upgrading "); ok && tracked[pkg] {
-			ReportProgress(ctx, pkg, PackageStarting)
+			ReportProgress(ctx, pkg, PackageBatchStarting)
 		}
 	}
 }

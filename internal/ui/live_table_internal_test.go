@@ -1,8 +1,11 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/teknikqa/upkeep/internal/provider"
 )
 
 // TestReportColumns_Pending verifies that pending providers show dashes.
@@ -694,4 +697,76 @@ func searchString(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// TestOnPackageProgress_BatchStartMovesPreviousToDone verifies that in a
+// batched upgrade (Starting events only), the previous package leaves the
+// "Remaining" list when the next one starts, and is not duplicated when the
+// final Updated event arrives.
+func TestOnPackageProgress_BatchStartMovesPreviousToDone(t *testing.T) {
+	lt := &LiveUpdateTable{
+		states: map[string]*providerUpdateState{"brew": {status: "updating"}},
+	}
+	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "a", Status: provider.PackageBatchStarting})
+	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "b", Status: provider.PackageBatchStarting})
+	s := lt.states["brew"]
+	if got := strings.Join(s.packages, ","); got != "a" {
+		t.Fatalf("packages after b starts = %q, want %q", got, "a")
+	}
+	got := formatUpdatingPackages(s.packages, []string{"a", "b", "c"}, s.currentPkg, 200)
+	if want := "a | Updating: b | Remaining: c"; len(got) != 1 || got[0] != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "a", Status: provider.PackageUpdated})
+	if n := len(s.packages); n != 1 {
+		t.Errorf("Updated for an already-listed package duplicated it: %v", s.packages)
+	}
+}
+
+// TestOnPackageProgress_RetryAfterBatchFailure verifies packages inferred as
+// done leave the done list when the per-package fallback restarts them.
+func TestOnPackageProgress_RetryAfterBatchFailure(t *testing.T) {
+	lt := &LiveUpdateTable{
+		states: map[string]*providerUpdateState{"brew": {status: "updating"}},
+	}
+	for _, n := range []string{"a", "b"} {
+		lt.OnPackageProgress("brew", provider.PackageProgress{Name: n, Status: provider.PackageBatchStarting})
+	}
+	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "a", Status: provider.PackageStarting})
+	s := lt.states["brew"]
+	if len(s.packages) != 0 || s.currentPkg != "a" {
+		t.Errorf("packages=%v current=%q, want none done and a current", s.packages, s.currentPkg)
+	}
+}
+
+// TestOnPackageProgress_RetryKeepsConfirmed verifies a retry reset only drops
+// inferred completions, not confirmed ones.
+func TestOnPackageProgress_RetryKeepsConfirmed(t *testing.T) {
+	lt := &LiveUpdateTable{
+		states: map[string]*providerUpdateState{"brew": {status: "updating"}},
+	}
+	st := func(n string, k provider.PackageStatus) {
+		lt.OnPackageProgress("brew", provider.PackageProgress{Name: n, Status: k})
+	}
+	st("b", provider.PackageBatchStarting)
+	st("c", provider.PackageBatchStarting) // b inferred done; batch then fails
+	st("a", provider.PackageStarting)
+	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "a", Status: provider.PackageUpdated})
+	st("b", provider.PackageStarting) // retry: inferred b and c are unknown again
+	if got := strings.Join(lt.states["brew"].packages, ","); got != "a" {
+		t.Errorf("packages = %q, want %q", got, "a")
+	}
+}
+
+// TestOnPackageProgress_PlainStartDoesNotInfer verifies concurrent providers
+// (plain Starting events) never mark another package as done.
+func TestOnPackageProgress_PlainStartDoesNotInfer(t *testing.T) {
+	lt := &LiveUpdateTable{
+		states: map[string]*providerUpdateState{"editors": {status: "updating"}},
+	}
+	lt.OnPackageProgress("editors", provider.PackageProgress{Name: "code", Status: provider.PackageStarting})
+	lt.OnPackageProgress("editors", provider.PackageProgress{Name: "cursor", Status: provider.PackageStarting})
+	if n := len(lt.states["editors"].packages); n != 0 {
+		t.Errorf("packages = %v, want none", lt.states["editors"].packages)
+	}
 }
