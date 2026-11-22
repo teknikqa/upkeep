@@ -722,3 +722,19 @@ func TestOnPackageProgress_BatchStartMovesPreviousToDone(t *testing.T) {
 		t.Errorf("Updated for an already-listed package duplicated it: %v", s.packages)
 	}
 }
+
+// TestOnPackageProgress_RetryAfterBatchFailure verifies packages inferred as
+// done leave the done list when the per-package fallback restarts them.
+func TestOnPackageProgress_RetryAfterBatchFailure(t *testing.T) {
+	lt := &LiveUpdateTable{
+		states: map[string]*providerUpdateState{"brew": {status: "updating"}},
+	}
+	for _, n := range []string{"a", "b"} {
+		lt.OnPackageProgress("brew", provider.PackageProgress{Name: n, Status: provider.PackageStarting})
+	}
+	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "a", Status: provider.PackageStarting})
+	s := lt.states["brew"]
+	if len(s.packages) != 0 || s.currentPkg != "a" {
+		t.Errorf("packages=%v current=%q, want none done and a current", s.packages, s.currentPkg)
+	}
+}

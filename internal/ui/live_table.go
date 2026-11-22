@@ -145,10 +145,14 @@ func (t *LiveUpdateTable) OnPackageProgress(providerName string, progress provid
 
 	switch progress.Status {
 	case provider.PackageStarting:
-		// A batched upgrade never reports completion per package, so a new
-		// start means the previous package has finished: move it out of the
-		// "Remaining" list.
-		if s.currentPkg != "" && s.currentPkg != progress.Name && !slices.Contains(s.packages, s.currentPkg) {
+		if slices.Contains(s.packages, progress.Name) {
+			// Retry (batch failed, per-package fallback): every package we
+			// inferred as done has an unknown outcome again, including the
+			// one that was running when the batch died.
+			s.packages = nil
+		} else if s.currentPkg != "" && s.currentPkg != progress.Name && !slices.Contains(s.packages, s.currentPkg) {
+			// A batched upgrade never reports completion per package, so a
+			// new start means the previous package has finished.
 			s.packages = append(s.packages, s.currentPkg)
 		}
 		// Record which package is about to be processed (for the footer).
