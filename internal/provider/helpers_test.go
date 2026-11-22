@@ -336,7 +336,7 @@ func TestOnUpgradeProgressLine_MatchesTrackedName(t *testing.T) {
 	onLine := provider.OnUpgradeProgressLine(ctx, map[string]bool{"git": true, "jq": true})
 	onLine("==> Upgrading git")
 
-	want := []provider.PackageProgress{{Name: "git", Status: provider.PackageStarting}}
+	want := []provider.PackageProgress{{Name: "git", Status: provider.PackageBatchStarting}}
 	if !slices.Equal(events, want) {
 		t.Errorf("expected events %v, got %v", want, events)
 	}

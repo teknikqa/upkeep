@@ -145,16 +145,16 @@ func (t *LiveUpdateTable) OnPackageProgress(providerName string, progress provid
 	}
 
 	switch progress.Status {
-	case provider.PackageStarting:
+	case provider.PackageStarting, provider.PackageBatchStarting:
 		if s.inferred[progress.Name] {
 			// Retry (batch failed, per-package fallback): packages we only
 			// inferred as done have an unknown outcome again. Confirmed
 			// results stay.
 			s.packages = slices.DeleteFunc(s.packages, func(p string) bool { return s.inferred[p] })
 			clear(s.inferred)
-		} else if s.currentPkg != "" && s.currentPkg != progress.Name && !slices.Contains(s.packages, s.currentPkg) {
-			// A batched upgrade never reports completion per package, so a
-			// new start means the previous package has finished.
+		} else if progress.Status == provider.PackageBatchStarting && s.currentPkg != "" && s.currentPkg != progress.Name && !slices.Contains(s.packages, s.currentPkg) {
+			// A sequential batch never reports completion per package, so a
+			// new batch start means the previous package has finished.
 			s.packages = append(s.packages, s.currentPkg)
 			if s.inferred == nil {
 				s.inferred = map[string]bool{}

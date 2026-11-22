@@ -707,8 +707,8 @@ func TestOnPackageProgress_BatchStartMovesPreviousToDone(t *testing.T) {
 	lt := &LiveUpdateTable{
 		states: map[string]*providerUpdateState{"brew": {status: "updating"}},
 	}
-	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "a", Status: provider.PackageStarting})
-	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "b", Status: provider.PackageStarting})
+	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "a", Status: provider.PackageBatchStarting})
+	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "b", Status: provider.PackageBatchStarting})
 	s := lt.states["brew"]
 	if got := strings.Join(s.packages, ","); got != "a" {
 		t.Fatalf("packages after b starts = %q, want %q", got, "a")
@@ -730,7 +730,7 @@ func TestOnPackageProgress_RetryAfterBatchFailure(t *testing.T) {
 		states: map[string]*providerUpdateState{"brew": {status: "updating"}},
 	}
 	for _, n := range []string{"a", "b"} {
-		lt.OnPackageProgress("brew", provider.PackageProgress{Name: n, Status: provider.PackageStarting})
+		lt.OnPackageProgress("brew", provider.PackageProgress{Name: n, Status: provider.PackageBatchStarting})
 	}
 	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "a", Status: provider.PackageStarting})
 	s := lt.states["brew"]
@@ -745,15 +745,28 @@ func TestOnPackageProgress_RetryKeepsConfirmed(t *testing.T) {
 	lt := &LiveUpdateTable{
 		states: map[string]*providerUpdateState{"brew": {status: "updating"}},
 	}
-	st := func(n string) {
-		lt.OnPackageProgress("brew", provider.PackageProgress{Name: n, Status: provider.PackageStarting})
+	st := func(n string, k provider.PackageStatus) {
+		lt.OnPackageProgress("brew", provider.PackageProgress{Name: n, Status: k})
 	}
-	st("b")
-	st("c") // b inferred done; batch then fails
-	st("a")
+	st("b", provider.PackageBatchStarting)
+	st("c", provider.PackageBatchStarting) // b inferred done; batch then fails
+	st("a", provider.PackageStarting)
 	lt.OnPackageProgress("brew", provider.PackageProgress{Name: "a", Status: provider.PackageUpdated})
-	st("b") // retry: inferred b and c are unknown again
+	st("b", provider.PackageStarting) // retry: inferred b and c are unknown again
 	if got := strings.Join(lt.states["brew"].packages, ","); got != "a" {
 		t.Errorf("packages = %q, want %q", got, "a")
+	}
+}
+
+// TestOnPackageProgress_PlainStartDoesNotInfer verifies concurrent providers
+// (plain Starting events) never mark another package as done.
+func TestOnPackageProgress_PlainStartDoesNotInfer(t *testing.T) {
+	lt := &LiveUpdateTable{
+		states: map[string]*providerUpdateState{"editors": {status: "updating"}},
+	}
+	lt.OnPackageProgress("editors", provider.PackageProgress{Name: "code", Status: provider.PackageStarting})
+	lt.OnPackageProgress("editors", provider.PackageProgress{Name: "cursor", Status: provider.PackageStarting})
+	if n := len(lt.states["editors"].packages); n != 0 {
+		t.Errorf("packages = %v, want none", lt.states["editors"].packages)
 	}
 }
