@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1](https://github.com/teknikqa/upkeep/compare/v1.1.0...v1.1.1) (2026-11-23)
+
+
+### Fixed
+
+* **deps:** bump fast-uri to 3.1.9 for security advisories ([#81](https://github.com/teknikqa/upkeep/issues/81)) ([f34cecb](https://github.com/teknikqa/upkeep/commit/f34cecbc805c3b212dac74516799ca3f726888f5))
+* **ui:** drop finished casks from the Remaining list during batch upgrades ([#79](https://github.com/teknikqa/upkeep/issues/79)) ([1df5e50](https://github.com/teknikqa/upkeep/commit/1df5e50254da21a8ba1ab796bb6df4e4812d8937))
+
 ## [1.1.0](https://github.com/teknikqa/upkeep/compare/v1.0.3...v1.1.0) (2026-10-13)
 
 
