@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2](https://github.com/teknikqa/upkeep/compare/v1.1.1...v1.1.2) (2026-11-23)
+
+
+### Fixed
+
+* stop listing up-to-date npm, yarn, pipx and uv packages as outdated ([#82](https://github.com/teknikqa/upkeep/issues/82)) ([2c4cef0](https://github.com/teknikqa/upkeep/commit/2c4cef051703b33c7274954ac35f3fca1279f26c))
+
 ## [1.1.1](https://github.com/teknikqa/upkeep/compare/v1.1.0...v1.1.1) (2026-11-23)
 
 
