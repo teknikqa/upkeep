@@ -168,3 +168,13 @@ func TestNpmScan_NotInstalled(t *testing.T) {
 		t.Errorf("expected unavailable, got %+v", res)
 	}
 }
+
+func TestParseNpmOutdated_SkipsPrereleaseAheadOfLatest(t *testing.T) {
+	items, err := provider.ParseNpmOutdated(`{"cf":{"current":"1.0.0-rc.4","wanted":"0.15.0","latest":"0.15.0"},"x":{"current":"1.0.0","wanted":"1.1.0","latest":"1.1.0"}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Name != "x" {
+		t.Errorf("expected only x, got %+v", items)
+	}
+}

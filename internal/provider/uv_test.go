@@ -97,6 +97,12 @@ func TestUvProvider_Scan_Available(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := provider.NewUvProvider(config.UvConfig{Enabled: true, SelfUpdate: tt.selfUpdate, Tool: tt.tool}, nil)
 			p.SetCheckAvailable(func() bool { return true })
+			p.SetQuery(func(_ context.Context, args ...string) (string, error) {
+				if args[0] == "tool" {
+					return "ruff v0.1.0\n", nil
+				}
+				return "", nil
+			})
 
 			result := p.Scan(context.Background())
 			if !result.Available {
@@ -239,4 +245,19 @@ func contains(names []string, target string) bool {
 		}
 	}
 	return false
+}
+
+func TestUvProvider_Scan_SkipsUpToDate(t *testing.T) {
+	p := provider.NewUvProvider(config.UvConfig{Enabled: true, SelfUpdate: true, Tool: true}, nil)
+	p.SetCheckAvailable(func() bool { return true })
+	p.SetQuery(func(_ context.Context, args ...string) (string, error) {
+		if args[0] == "self" {
+			return "error: uv was installed through an external package manager and cannot update itself.", errors.New("exit 2")
+		}
+		return "", nil // `uv tool list --outdated`: nothing outdated
+	})
+
+	if result := p.Scan(context.Background()); len(result.Outdated) != 0 {
+		t.Errorf("expected no items for managed uv with no outdated tools, got %+v", result.Outdated)
+	}
 }

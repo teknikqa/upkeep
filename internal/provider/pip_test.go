@@ -342,3 +342,16 @@ func TestPipProvider_Update_NotExternallyManaged_BatchesPackages(t *testing.T) {
 		t.Errorf("expected 2 items accounted for, got updated=%v failed=%v", result.Updated, result.Failed)
 	}
 }
+
+func TestPipProvider_Scan_PipxWithoutPackages(t *testing.T) {
+	if !provider.CommandExistsExport("pipx") || !provider.CommandExistsExport("pip3") {
+		t.Skip("pip3 and pipx required")
+	}
+	p := provider.NewPipProvider(config.PipConfig{Enabled: true, Pipx: true}, nil)
+	p.SetCheckExternallyManaged(func(_ context.Context) bool { return true })
+	p.SetListPipx(func(_ context.Context) (string, error) { return "", nil })
+
+	if result := p.Scan(context.Background()); len(result.Outdated) != 0 {
+		t.Errorf("expected no pipx item without packages, got %+v", result.Outdated)
+	}
+}

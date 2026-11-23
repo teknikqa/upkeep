@@ -19,6 +19,10 @@ type UvProvider struct {
 	// When nil, the real CommandExists("uv") is used.
 	checkAvailable func() bool
 
+	// query overrides read-only uv invocations (`uv self update --dry-run`,
+	// `uv tool list --outdated`) for testing. When nil, the real command is run.
+	query func(ctx context.Context, args ...string) (string, error)
+
 	// runSelfUpdate overrides `uv self update` for testing. When nil, the
 	// real command is run.
 	runSelfUpdate func(ctx context.Context) (string, error)
@@ -47,10 +51,20 @@ func (p *UvProvider) Scan(ctx context.Context) ScanResult {
 
 	var items []OutdatedItem
 	if p.cfg.SelfUpdate {
-		items = append(items, OutdatedItem{Name: "uv (self)", LatestVersion: "self-update"})
+		// Managed installs (brew etc.) can't self-update; their package
+		// manager reports them, so listing uv here would be a permanent false positive.
+		out, err := p.doQuery(ctx, "self", "update", "--dry-run")
+		if err == nil || !isUvManagedInstall(out) {
+			items = append(items, OutdatedItem{Name: "uv (self)", LatestVersion: "self-update"})
+		}
 	}
 	if p.cfg.Tool {
-		items = append(items, OutdatedItem{Name: "uv tool (all packages)", LatestVersion: "upgrade-all"})
+		// shortcut: any query error keeps the item (fail open), so a broken
+		// query can't hide real updates.
+		out, err := p.doQuery(ctx, "tool", "list", "--outdated")
+		if err != nil || strings.TrimSpace(out) != "" {
+			items = append(items, OutdatedItem{Name: "uv tool (all packages)", LatestVersion: "upgrade-all"})
+		}
 	}
 
 	return ScanResult{Available: true, Outdated: items}
@@ -113,6 +127,16 @@ func (p *UvProvider) isAvailable() bool {
 		return p.checkAvailable()
 	}
 	return CommandExists("uv")
+}
+
+// doQuery calls the provider's override if set, otherwise runs `uv <args>` and
+// returns combined stdout+stderr (uv prints its managed-install error on stderr).
+func (p *UvProvider) doQuery(ctx context.Context, args ...string) (string, error) {
+	if p.query != nil {
+		return p.query(ctx, args...)
+	}
+	stdout, stderr, err := RunCommand(ctx, "uv", args...)
+	return stdout + stderr, err
 }
 
 // doSelfUpdate calls the provider's override if set, otherwise runs the real

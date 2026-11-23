@@ -37,6 +37,10 @@ type YarnProvider struct {
 	// command is run.
 	runVersion func(ctx context.Context) (string, error)
 
+	// runList overrides `yarn global list --depth=0` for testing. When nil,
+	// the real command is run.
+	runList func(ctx context.Context) (string, error)
+
 	// runUpgrade overrides `yarn global upgrade` for testing. When nil, the
 	// real command is run.
 	runUpgrade func(ctx context.Context) (string, error)
@@ -66,6 +70,11 @@ func (p *YarnProvider) Scan(ctx context.Context) ScanResult {
 			Available: true,
 			Message:   "yarn: Berry (2.x+) detected — `yarn global` was removed; switch to Yarn Classic (1.x) for global package management, or use `yarn dlx` per-invocation",
 		}
+	}
+
+	// No global packages installed: nothing to upgrade. Errors fail open.
+	if out, err := p.doList(ctx); err == nil && !yarnHasGlobalPackages(out) {
+		return ScanResult{Available: true}
 	}
 
 	return ScanResult{
@@ -113,6 +122,29 @@ func (p *YarnProvider) doVersion(ctx context.Context) (string, error) {
 	}
 	stdout, _, err := RunCommand(ctx, "yarn", "--version")
 	return stdout, err
+}
+
+// doList calls the provider's override if set, otherwise runs the real
+// `yarn global list --depth=0` command.
+func (p *YarnProvider) doList(ctx context.Context) (string, error) {
+	if p.runList != nil {
+		return p.runList(ctx)
+	}
+	stdout, _, err := RunCommand(ctx, "yarn", "global", "list", "--depth=0")
+	return stdout, err
+}
+
+// yarnHasGlobalPackages reports whether `yarn global list` output names any
+// package. Classic prints `info "pkg@1.0.0" has binaries:` or `├─ pkg@1.0.0`
+// lines; an empty global dir prints only the version header and "Done".
+func yarnHasGlobalPackages(out string) bool {
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "info \"") || strings.HasPrefix(line, "├─") || strings.HasPrefix(line, "└─") {
+			return true
+		}
+	}
+	return false
 }
 
 // doUpgrade calls the provider's override if set, otherwise runs the real
