@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/teknikqa/upkeep/internal/config"
@@ -110,6 +112,11 @@ func parseNpmOutdated(jsonStr string) ([]OutdatedItem, error) {
 
 	items := make([]OutdatedItem, 0, len(raw))
 	for name, info := range raw {
+		// A prerelease ahead of the "latest" tag (e.g. 1.0.0-rc.4 vs 0.15.0)
+		// is not outdated; installing @latest would downgrade it.
+		if versionCoreGreater(info.Current, info.Latest) {
+			continue
+		}
 		items = append(items, OutdatedItem{
 			Name:           name,
 			CurrentVersion: info.Current,
@@ -117,6 +124,38 @@ func parseNpmOutdated(jsonStr string) ([]OutdatedItem, error) {
 		})
 	}
 	return items, nil
+}
+
+// versionCoreGreater reports whether a's major.minor.patch is strictly greater
+// than b's, ignoring prerelease tags. Unparsable input returns false.
+func versionCoreGreater(a, b string) bool {
+	pa, pb := versionCore(a), versionCore(b)
+	if pa == nil || pb == nil {
+		return false
+	}
+	for i := range pa {
+		if pa[i] != pb[i] {
+			return pa[i] > pb[i]
+		}
+	}
+	return false
+}
+
+func versionCore(v string) []int {
+	core, _, _ := strings.Cut(strings.TrimPrefix(v, "v"), "-")
+	parts := strings.Split(core, ".")
+	if len(parts) != 3 {
+		return nil
+	}
+	nums := make([]int, 3)
+	for i, s := range parts {
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			return nil
+		}
+		nums[i] = n
+	}
+	return nums
 }
 
 func (p *NpmProvider) logf(format string, args ...any) {

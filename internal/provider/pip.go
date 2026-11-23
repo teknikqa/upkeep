@@ -31,6 +31,9 @@ type PipProvider struct {
 	// listOutdated overrides the pip3 outdated query for testing. When nil,
 	// the real `pip3 list --outdated --format=json` is run.
 	listOutdated func(ctx context.Context) (string, error)
+
+	// listPipx overrides `pipx list --short` for testing.
+	listPipx func(ctx context.Context) (string, error)
 }
 
 // NewPipProvider creates a new pip provider.
@@ -73,8 +76,9 @@ func (p *PipProvider) Scan(ctx context.Context) ScanResult {
 		}
 	}
 
-	// Indicate pipx is available as a pseudo-item (no per-package scan needed).
-	if pipxExists {
+	// Indicate pipx is available as a pseudo-item (no per-package scan needed),
+	// but only when it manages at least one package.
+	if pipxExists && p.pipxHasPackages(ctx) {
 		items = append(items, OutdatedItem{
 			Name:          "pipx (all packages)",
 			LatestVersion: "upgrade-all",
@@ -240,6 +244,19 @@ func (p *PipProvider) runListOutdated(ctx context.Context) (string, error) {
 	}
 	stdout, _, err := RunCommand(ctx, "pip3", "list", "--outdated", "--format=json")
 	return stdout, err
+}
+
+// pipxHasPackages reports whether pipx manages any package. Packages with a
+// broken interpreter print only to stderr, so stdout stays empty for them and
+// `pipx upgrade-all` could not upgrade them anyway.
+func (p *PipProvider) pipxHasPackages(ctx context.Context) bool {
+	var stdout string
+	if p.listPipx != nil {
+		stdout, _ = p.listPipx(ctx)
+	} else {
+		stdout, _, _ = RunCommand(ctx, "pipx", "list", "--short")
+	}
+	return strings.TrimSpace(stdout) != ""
 }
 
 func (p *PipProvider) logf(format string, args ...any) {

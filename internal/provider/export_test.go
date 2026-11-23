@@ -247,3 +247,18 @@ func (p *BunProvider) SetRunOutdated(fn func(ctx context.Context) (stdout, stder
 func (p *BunProvider) SetRunUpdate(fn func(ctx context.Context, names []string) (string, error)) {
 	p.runUpdate = fn
 }
+
+// SetQuery sets the read-only `uv` query override on a UvProvider for testing.
+func (p *UvProvider) SetQuery(fn func(ctx context.Context, args ...string) (string, error)) {
+	p.query = fn
+}
+
+// SetRunList sets the `yarn global list` override on a YarnProvider for testing.
+func (p *YarnProvider) SetRunList(fn func(ctx context.Context) (string, error)) {
+	p.runList = fn
+}
+
+// SetListPipx sets the `pipx list --short` override on a PipProvider for testing.
+func (p *PipProvider) SetListPipx(fn func(ctx context.Context) (string, error)) {
+	p.listPipx = fn
+}

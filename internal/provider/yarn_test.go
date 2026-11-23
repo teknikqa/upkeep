@@ -77,6 +77,9 @@ func TestYarnProvider_Scan_Classic(t *testing.T) {
 	p := provider.NewYarnProvider(config.YarnConfig{Enabled: true}, nil)
 	p.SetCheckAvailable(func() bool { return true })
 	p.SetRunVersion(func(_ context.Context) (string, error) { return "1.22.22", nil })
+	p.SetRunList(func(_ context.Context) (string, error) {
+		return "yarn global v1.22.22\ninfo \"typescript@5.0.0\" has binaries:\nDone in 0.1s.\n", nil
+	})
 
 	result := p.Scan(context.Background())
 	if !result.Available {
@@ -154,5 +157,16 @@ func TestYarnProvider_Update(t *testing.T) {
 				t.Errorf("failed: got %v, want %v (result=%+v)", gotFailed, tt.wantFailed, result)
 			}
 		})
+	}
+}
+
+func TestYarnProvider_Scan_NoGlobalPackages(t *testing.T) {
+	p := provider.NewYarnProvider(config.YarnConfig{Enabled: true}, nil)
+	p.SetCheckAvailable(func() bool { return true })
+	p.SetRunVersion(func(_ context.Context) (string, error) { return "1.22.22", nil })
+	p.SetRunList(func(_ context.Context) (string, error) { return "yarn global v1.22.22\nDone in 0.02s.\n", nil })
+
+	if result := p.Scan(context.Background()); len(result.Outdated) != 0 {
+		t.Errorf("expected no items without global packages, got %+v", result.Outdated)
 	}
 }
