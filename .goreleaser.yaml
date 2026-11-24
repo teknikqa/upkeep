@@ -37,6 +37,13 @@ homebrew_casks:
     description: "A Go CLI tool that keeps your macOS development environment up to date"
     binaries:
       - upkeep
+    # The binary is not notarized, so Gatekeeper blocks it while quarantined.
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/upkeep"]
+          end
 
 changelog:
   sort: asc
